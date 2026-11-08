@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
@@ -24,6 +26,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.FileOpen
+import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -45,6 +48,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -65,6 +71,7 @@ import io.github.linguaplayer.importer.LoadedFile
 import io.github.linguaplayer.importer.PlannedRow
 import io.github.linguaplayer.importer.RowAction
 import io.github.linguaplayer.importer.RowError
+import io.github.linguaplayer.importer.SampleCsv
 import io.github.linguaplayer.importer.SkipReason
 import io.github.linguaplayer.ui.components.DropdownField
 import io.github.linguaplayer.ui.components.appContainer
@@ -122,7 +129,19 @@ private fun PickStep(s: ImportUiState, vm: ImportViewModel, modifier: Modifier) 
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) vm.onFilePicked(context, uri)
     }
-    Column(modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+    // Сохранение примера: пользователь сам выбирает папку (например, «Загрузки» или Google Диск).
+    var sampleMessage by remember { mutableStateOf<Int?>(null) }
+    val saveSample = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
+        if (uri != null) {
+            sampleMessage = runCatching {
+                context.contentResolver.openOutputStream(uri, "wt")!!.use { it.write(SampleCsv.bytes()) }
+            }.fold({ R.string.sample_saved }, { R.string.sample_save_failed })
+        }
+    }
+    Column(
+        modifier.verticalScroll(rememberScrollState()).padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
         Icon(Icons.Outlined.FileOpen, null, Modifier.size(64.dp), tint = MaterialTheme.colorScheme.primary)
         Spacer(Modifier.height(16.dp))
         Text(stringResource(R.string.import_pick_title), style = MaterialTheme.typography.headlineSmall)
@@ -142,6 +161,82 @@ private fun PickStep(s: ImportUiState, vm: ImportViewModel, modifier: Modifier) 
         s.fileError?.let {
             Spacer(Modifier.height(16.dp))
             Text(fileErrorText(it), color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center)
+        }
+        Spacer(Modifier.height(32.dp))
+        SampleCard(onSave = { saveSample.launch(SampleCsv.FILE_NAME) })
+        sampleMessage?.let {
+            Text(
+                stringResource(it),
+                color = if (it == R.string.sample_saved) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(top = 12.dp),
+            )
+        }
+    }
+}
+
+/** Образец заполнения: заголовок и три строки (слово, фраза, несколько переводов и тегов). */
+@Composable
+private fun SampleCard(onSave: () -> Unit) {
+    val notes = listOf(R.string.sample_row_word, R.string.sample_row_phrase, R.string.sample_row_tags)
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            Text(stringResource(R.string.sample_title), style = MaterialTheme.typography.titleMedium)
+            Text(
+                stringResource(R.string.sample_intro),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
+            )
+            Surface(shape = RoundedCornerShape(8.dp), color = MaterialTheme.colorScheme.surface) {
+                Column(Modifier.fillMaxWidth().padding(8.dp)) {
+                    SampleRow(SampleCsv.HEADER, header = true, note = null)
+                    SampleCsv.ROWS.forEachIndexed { i, row ->
+                        HorizontalDivider()
+                        SampleRow(row, header = false, note = stringResource(notes[i]))
+                    }
+                }
+            }
+            Text(
+                stringResource(R.string.sample_rules),
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(top = 12.dp),
+            )
+            OutlinedButton(onClick = onSave, modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) {
+                Icon(Icons.Outlined.Download, null)
+                Text(stringResource(R.string.sample_save), Modifier.padding(start = 8.dp))
+            }
+        }
+    }
+}
+
+/** Доли ширины столбцов образца: таблица помещается на узком экране, текст переносится. */
+private val SAMPLE_WEIGHTS = listOf(1.0f, 1.35f, 1.0f, 1.1f)
+
+@Composable
+private fun SampleRow(cells: List<String>, header: Boolean, note: String?) {
+    Column(Modifier.padding(vertical = 6.dp)) {
+        Row(verticalAlignment = Alignment.Top) {
+            cells.forEachIndexed { i, cell ->
+                Text(
+                    cell,
+                    style = if (header) MaterialTheme.typography.labelSmall else MaterialTheme.typography.bodySmall,
+                    softWrap = !header,
+                    color = if (header) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(SAMPLE_WEIGHTS[i]).padding(end = 6.dp),
+                )
+            }
+        }
+        if (note != null) {
+            Text(
+                "↑ $note",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.secondary,
+                modifier = Modifier.padding(top = 2.dp),
+            )
         }
     }
 }

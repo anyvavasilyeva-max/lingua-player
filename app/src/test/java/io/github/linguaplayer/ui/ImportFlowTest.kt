@@ -57,6 +57,11 @@ class ImportFlowTest {
         rule.setContent { LinguaTheme { ImportScreen(onBack = {}, onFinished = {}) } }
         waitText("Выбрать файл")
         shot("10_import_pick")
+        // Встроенный пример заполнения файла.
+        waitText("Как заполнить файл")
+        rule.onAllNodesWithText("Сохранить пример CSV", useUnmergedTree = true)[0].performScrollTo()
+        waitText("↑ несколько переводов и тегов")
+        shot("10b_import_sample")
         val vm = ViewModelProvider(rule.activity)[ImportViewModel::class.java]
         rule.runOnUiThread<Unit> { vm.onFilePicked(rule.activity, Uri.fromFile(file)) }
 
