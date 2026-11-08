@@ -18,6 +18,7 @@ import androidx.compose.material.icons.outlined.Clear
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.FileUpload
 import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.NewLabel
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.SelectAll
@@ -152,6 +153,17 @@ class LibraryViewModel(private val c: AppContainer) : ViewModel() {
 
     suspend fun normalPlaylists() = c.playlists.normalPlaylists()
 
+    /** Слушать найденные записи (или только выбранные, если есть выбор). */
+    fun play(title: String, onStarted: () -> Unit) = viewModelScope.launch {
+        val all = entries.value.orEmpty().map { it.entry }
+        val sel = selected.value
+        val list = if (sel.isEmpty()) all else all.filter { it.id in sel }
+        if (list.isEmpty()) return@launch
+        c.startPlayback(title, list)
+        clearSelection()
+        onStarted()
+    }
+
     fun consumeMessage() { message.value = null }
 }
 
@@ -164,6 +176,7 @@ fun LibraryScreen(
     onAddEntry: () -> Unit,
     onManageTags: () -> Unit,
     onImport: () -> Unit,
+    onOpenPlayer: () -> Unit,
 ) {
     val c = appContainer()
     val vm: LibraryViewModel = viewModel { LibraryViewModel(c) }
@@ -179,6 +192,7 @@ fun LibraryScreen(
     val snackbar = remember { SnackbarHostState() }
 
     BackHandler(enabled = selecting) { vm.clearSelection() }
+    val libraryTitle = stringResource(R.string.nav_library)
 
     val messageText = when (val m = message) {
         is LibraryMessage.TagsUpdated -> stringResource(R.string.selection_done_tags, m.count)
@@ -202,6 +216,9 @@ fun LibraryScreen(
                     },
                     title = { Text(stringResource(R.string.selection_count, selected.size), maxLines = 1, style = MaterialTheme.typography.titleMedium) },
                     actions = {
+                        IconButton(onClick = { vm.play(libraryTitle, onOpenPlayer) }) {
+                            Icon(Icons.Outlined.PlayArrow, stringResource(R.string.player_listen))
+                        }
                         IconButton(onClick = vm::selectAllVisible) { Icon(Icons.Outlined.SelectAll, stringResource(R.string.selection_all)) }
                         IconButton(onClick = { dialog = LibraryDialog.ADD_TAGS }) {
                             Icon(Icons.Outlined.NewLabel, stringResource(R.string.selection_add_tags))
@@ -229,6 +246,9 @@ fun LibraryScreen(
                 TopAppBar(
                     title = { Text(stringResource(R.string.nav_library)) },
                     actions = {
+                        IconButton(onClick = { vm.play(libraryTitle, onOpenPlayer) }, enabled = !entries.isNullOrEmpty()) {
+                            Icon(Icons.Outlined.PlayArrow, contentDescription = stringResource(R.string.library_play))
+                        }
                         IconButton(onClick = onImport) {
                             Icon(Icons.Outlined.FileUpload, contentDescription = stringResource(R.string.import_action))
                         }

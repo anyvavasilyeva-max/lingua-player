@@ -197,4 +197,75 @@
     <string name="smart_pair_any">Любая языковая пара</string>
     <string name="smart_tags_none">Без условия по тегам</string>
     <string name="smart_edit">Изменить условия</string>
+
+    <!-- Плеер -->
+    <string name="player_listen">Слушать</string>
+    <string name="player_now_playing">Сейчас звучит</string>
+    <string name="player_empty">Откройте плейлист или библиотеку и нажмите «Слушать».</string>
+    <string name="player_position">%1$d из %2$d</string>
+    <string name="player_play">Воспроизвести</string>
+    <string name="player_pause">Пауза</string>
+    <string name="player_next">Следующая</string>
+    <string name="player_previous">Предыдущая</string>
+    <string name="player_settings">Настройки воспроизведения</string>
+    <string name="player_dont_remember">Не помню</string>
+    <string name="player_dont_remember_on">Отмечено «Не помню»</string>
+    <string name="player_ended">Очередь закончилась. Нажмите ▶, чтобы начать сначала.</string>
+    <string name="player_no_translation">перевод не озвучивается</string>
+    <string name="player_err_engine">Синтезатор речи не запустился. Проверьте, что на телефоне установлен и включён движок синтеза речи (например, Google).</string>
+    <string name="player_err_language">Нет голоса для языка «%1$s». Установите голосовые данные этого языка.</string>
+    <string name="player_err_failures">Синтезатор несколько раз подряд не смог произнести фразу. Попробуйте другой движок или голос.</string>
+    <string name="player_open_voices">Настройки голоса</string>
+    <string name="player_nothing_to_play">Нет записей для воспроизведения</string>
+    <string name="player_queue_filtered">С текущим фильтром («%1$s») здесь нет записей. Измените его в настройках воспроизведения.</string>
+    <string name="play_from_here">Слушать с этой записи</string>
+    <string name="library_play">Слушать найденные</string>
+
+    <string name="ps_direction">Направление</string>
+    <string name="ps_dir_random">Случайно</string>
+    <string name="ps_entries">Записи</string>
+    <string name="ps_order">Порядок</string>
+    <string name="ps_order_seq">По порядку</string>
+    <string name="ps_order_shuffle">Перемешать</string>
+    <string name="ps_pause">Пауза между словом и переводом</string>
+    <string name="ps_seconds">%1$d с</string>
+    <string name="ps_repeats">Сколько раз произносить %1$s</string>
+    <string name="ps_repeats_value">%1$d×</string>
+    <string name="ps_rate_source">Скорость: %1$s</string>
+    <string name="ps_rate_target">Скорость: %1$s</string>
+    <string name="ps_translation">Произносить перевод</string>
+    <string name="ps_translation_desc">Выключите, чтобы слышать только изучаемый язык</string>
+    <string name="ps_studied_language">изучаемый язык</string>
+    <string name="ps_translation_language">перевод</string>
+    <string name="ps_summary_pause">пауза %1$d с</string>
+
+    <!-- Голоса -->
+    <string name="tts_title">Голоса и озвучка</string>
+    <string name="tts_engine">Движок синтеза речи</string>
+    <string name="tts_engine_default">Системный по умолчанию (%1$s)</string>
+    <string name="tts_engine_none">Движки синтеза речи не найдены. Установите «Синтезатор речи Google» из Google Play (или другой движок).</string>
+    <string name="tts_starting">Запуск синтезатора…</string>
+    <string name="tts_languages">Языки ваших пар</string>
+    <string name="tts_status_offline">Голос установлен, работает без интернета</string>
+    <string name="tts_status_network">Голос есть, но только онлайн — без интернета работать не будет. Скачайте офлайн-голос.</string>
+    <string name="tts_status_available">Голос доступен (движок не сообщает, нужен ли интернет)</string>
+    <string name="tts_status_missing">Голос не скачан — нужно установить данные</string>
+    <string name="tts_status_unsupported">Этот движок не поддерживает язык. Попробуйте другой движок.</string>
+    <string name="tts_status_unknown">Нет данных — синтезатор не запущен</string>
+    <string name="tts_test">Проверить</string>
+    <string name="tts_install">Установить</string>
+    <string name="tts_open_system">Системные настройки синтеза речи</string>
+    <string name="tts_refresh">Обновить</string>
+    <string name="tts_help_title">Как установить корейский (и другие) голоса</string>
+    <string name="tts_help_text">1. Нажмите «Системные настройки синтеза речи» ниже.
+2. Выберите движок «Google» (Синтезатор речи Google) и нажмите ⚙ рядом с ним.
+3. «Установка голосовых данных» → «Корейский» (한국어) → скачайте голос. Так же — для русского.
+4. Вернитесь сюда и нажмите «Обновить»: должно появиться «работает без интернета».
+
+На Samsung можно использовать и Samsung TTS: «Настройки → Общие настройки → Язык → Синтез речи». Если движка Google нет — установите «Синтезатор речи Google» (Speech Services by Google) из Google Play.
+
+Приложение не может скачать голос само и не может гарантировать озвучку без интернета, если на телефоне нет офлайн-голоса.</string>
+    <string name="tts_test_failed">Не удалось произнести: %1$s</string>
+    <string name="settings_voices">Голоса и озвучка</string>
+    <string name="settings_voices_desc">Движок, проверка голосов, установка корейского</string>
 </resources>

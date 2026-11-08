@@ -12,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.RecordVoiceOver
 import androidx.compose.material.icons.automirrored.outlined.Label
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -75,7 +76,7 @@ class SettingsViewModel(private val c: AppContainer) : ViewModel() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(onManageTags: () -> Unit) {
+fun SettingsScreen(onManageTags: () -> Unit, onOpenVoices: () -> Unit) {
     val c = appContainer()
     val vm: SettingsViewModel = viewModel { SettingsViewModel(c) }
     val pairs by vm.pairs.collectAsStateWithLifecycle()
@@ -120,6 +121,13 @@ fun SettingsScreen(onManageTags: () -> Unit) {
                     modifier = Modifier.clickable { showAdd = true },
                     leadingContent = { Icon(Icons.Outlined.Add, null) },
                     headlineContent = { Text(stringResource(R.string.settings_add_pair)) },
+                )
+                HorizontalDivider()
+                ListItem(
+                    modifier = Modifier.clickable(onClick = onOpenVoices),
+                    leadingContent = { Icon(Icons.Outlined.RecordVoiceOver, null) },
+                    headlineContent = { Text(stringResource(R.string.settings_voices)) },
+                    supportingContent = { Text(stringResource(R.string.settings_voices_desc)) },
                 )
                 HorizontalDivider()
                 ListItem(

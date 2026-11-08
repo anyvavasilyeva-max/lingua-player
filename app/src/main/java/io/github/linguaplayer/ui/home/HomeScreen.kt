@@ -18,11 +18,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.QueueMusic
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.FileUpload
+import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.automirrored.outlined.LibraryBooks
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -50,6 +52,8 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 data class HomeState(
     val pairName: String = "",
@@ -58,7 +62,15 @@ data class HomeState(
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
-class HomeViewModel(c: AppContainer) : ViewModel() {
+class HomeViewModel(private val c: AppContainer) : ViewModel() {
+    fun playLibrary(title: String, onStarted: () -> Unit) = viewModelScope.launch {
+        val pair = c.activePair.first() ?: return@launch
+        val list = c.entries.getEntries(io.github.linguaplayer.data.db.EntryFilter(pairId = pair.id))
+        if (list.isEmpty()) return@launch
+        c.startPlayback(title, list)
+        onStarted()
+    }
+
     val state = c.activePair.flatMapLatest { pair ->
         val count = if (pair == null) flowOf(0) else c.entries.observeCountForPair(pair.id)
         combine(count, c.playlists.observeRecent(5)) { n, recent ->
@@ -73,10 +85,12 @@ fun HomeScreen(
     onOpenPlaylists: () -> Unit,
     onOpenPlaylist: (Long) -> Unit,
     onImport: () -> Unit,
+    onOpenPlayer: () -> Unit,
 ) {
     val c = appContainer()
     val vm: HomeViewModel = viewModel { HomeViewModel(c) }
     val state by vm.state.collectAsStateWithLifecycle()
+    val libraryTitle = stringResource(R.string.nav_library)
 
     LazyColumn(Modifier.fillMaxSize().statusBarsPadding(), contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp)) {
         item {
@@ -91,9 +105,14 @@ fun HomeScreen(
             ) {
                 Row(Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.AutoMirrored.Outlined.LibraryBooks, null, Modifier.size(40.dp))
-                    Column(Modifier.padding(start = 16.dp)) {
+                    Column(Modifier.padding(start = 16.dp).weight(1f)) {
                         Text(stringResource(R.string.home_library_card), style = MaterialTheme.typography.titleLarge)
                         Text(pluralStringResource(R.plurals.entries_count, state.entryCount, state.entryCount))
+                    }
+                    if (state.entryCount > 0) {
+                        FilledIconButton(onClick = { vm.playLibrary(libraryTitle, onOpenPlayer) }, modifier = Modifier.size(52.dp)) {
+                            Icon(Icons.Outlined.PlayArrow, stringResource(R.string.player_listen))
+                        }
                     }
                 }
             }

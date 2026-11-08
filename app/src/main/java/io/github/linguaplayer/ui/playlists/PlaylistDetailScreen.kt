@@ -10,6 +10,8 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -65,13 +67,21 @@ class PlaylistDetailViewModel(private val c: AppContainer, private val id: Long)
         }
     }
 
+    /** Запуск воспроизведения плейлиста (с начала или с выбранной записи). */
+    fun play(startEntryId: Long? = null, onStarted: () -> Unit) = viewModelScope.launch {
+        val p = playlist.value ?: return@launch
+        val list = entries.value ?: return@launch
+        c.startPlayback(p.name, list.map { it.entry }, p.id, startEntryId)
+        onStarted()
+    }
+
     fun move(from: Int, to: Int) = viewModelScope.launch { c.playlists.move(id, from, to) }
     fun remove(entryId: Long) = viewModelScope.launch { c.playlists.removeEntries(id, listOf(entryId)) }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PlaylistDetailScreen(playlistId: Long, onBack: () -> Unit, onOpenEntry: (Long) -> Unit) {
+fun PlaylistDetailScreen(playlistId: Long, onBack: () -> Unit, onOpenEntry: (Long) -> Unit, onOpenPlayer: () -> Unit) {
     val c = appContainer()
     val vm: PlaylistDetailViewModel = viewModel(key = "playlist-$playlistId") { PlaylistDetailViewModel(c, playlistId) }
     val playlist by vm.playlist.collectAsStateWithLifecycle()
@@ -110,6 +120,15 @@ fun PlaylistDetailScreen(playlistId: Long, onBack: () -> Unit, onOpenEntry: (Lon
                 },
             )
         },
+        floatingActionButton = {
+            if (!entries.isNullOrEmpty()) {
+                ExtendedFloatingActionButton(
+                    onClick = { vm.play(onStarted = onOpenPlayer) },
+                    icon = { Icon(Icons.Outlined.PlayArrow, null) },
+                    text = { Text(stringResource(R.string.player_listen)) },
+                )
+            }
+        },
     ) { padding ->
         val list = entries
         when {
@@ -123,17 +142,17 @@ fun PlaylistDetailScreen(playlistId: Long, onBack: () -> Unit, onOpenEntry: (Lon
                     EntryRow(
                         item,
                         onClick = { onOpenEntry(item.entry.id) },
-                        trailing = if (normal) {
-                            {
-                                EntryOrderMenu(
-                                    canUp = index > 0,
-                                    canDown = index < list.lastIndex,
-                                    onUp = { vm.move(index, index - 1) },
-                                    onDown = { vm.move(index, index + 1) },
-                                    onRemove = { vm.remove(item.entry.id) },
-                                )
-                            }
-                        } else null,
+                        trailing = {
+                            EntryOrderMenu(
+                                editable = normal,
+                                canUp = index > 0,
+                                canDown = index < list.lastIndex,
+                                onUp = { vm.move(index, index - 1) },
+                                onDown = { vm.move(index, index + 1) },
+                                onRemove = { vm.remove(item.entry.id) },
+                                onPlayFromHere = { vm.play(item.entry.id, onOpenPlayer) },
+                            )
+                        },
                     )
                 }
             }
@@ -156,11 +175,24 @@ fun PlaylistDetailScreen(playlistId: Long, onBack: () -> Unit, onOpenEntry: (Lon
 }
 
 @Composable
-private fun EntryOrderMenu(canUp: Boolean, canDown: Boolean, onUp: () -> Unit, onDown: () -> Unit, onRemove: () -> Unit) {
+private fun EntryOrderMenu(
+    editable: Boolean,
+    canUp: Boolean,
+    canDown: Boolean,
+    onUp: () -> Unit,
+    onDown: () -> Unit,
+    onRemove: () -> Unit,
+    onPlayFromHere: () -> Unit,
+) {
     var open by remember { mutableStateOf(false) }
     Box {
         IconButton(onClick = { open = true }) { Icon(Icons.Outlined.MoreVert, stringResource(R.string.action_more)) }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.play_from_here)) },
+                onClick = { open = false; onPlayFromHere() },
+            )
+            if (!editable) return@DropdownMenu
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.playlist_move_up)) },
                 enabled = canUp,

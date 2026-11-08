@@ -7,6 +7,7 @@ import androidx.compose.ui.test.hasScrollToNodeAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.ComposeTestRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -48,6 +49,12 @@ class UiTestHelper(private val rule: ComposeTestRule) {
             runCatching { rule.onAllNodes(hasScrollToNodeAction())[0].performScrollToNode(hasText(text)) }
         }
         false
+    }
+
+    /** Ждёт элемент с описанием (иконка-кнопка) и нажимает его. */
+    fun clickDesc(description: String) {
+        realWait { rule.onAllNodesWithContentDescription(description).fetchSemanticsNodes().isNotEmpty() }
+        rule.onAllNodesWithContentDescription(description)[0].performClick()
     }
 
     fun click(text: String) {

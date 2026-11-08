@@ -99,6 +99,12 @@ interface EntryDao {
     @Query("SELECT COUNT(*) FROM entry_tags WHERE entry_id = :entryId AND tag_id = :tagId")
     suspend fun hasTag(entryId: Long, tagId: Long): Int
 
+    @Query(
+        "SELECT COUNT(*) > 0 FROM entry_tags et JOIN tags t ON t.id = et.tag_id " +
+            "WHERE et.entry_id = :entryId AND t.system_key = :systemKey",
+    )
+    fun observeHasSystemTag(entryId: Long, systemKey: String): Flow<Boolean>
+
     @Query("SELECT * FROM entry_tags")
     fun observeAllTagLinks(): Flow<List<EntryTagCrossRef>>
 }

@@ -32,6 +32,11 @@ import io.github.linguaplayer.ui.library.LibraryScreen
 import io.github.linguaplayer.ui.playlists.PlaylistDetailScreen
 import io.github.linguaplayer.ui.playlists.PlaylistsScreen
 import io.github.linguaplayer.ui.settings.SettingsScreen
+import io.github.linguaplayer.ui.settings.TtsSettingsScreen
+import io.github.linguaplayer.ui.player.MiniPlayer
+import io.github.linguaplayer.ui.player.PlayerScreen
+import io.github.linguaplayer.ui.components.appContainer
+import androidx.compose.foundation.layout.Column
 import io.github.linguaplayer.ui.tags.TagsScreen
 
 object Routes {
@@ -41,6 +46,8 @@ object Routes {
     const val SETTINGS = "settings"
     const val TAGS = "tags"
     const val IMPORT = "import"
+    const val PLAYER = "player"
+    const val VOICES = "voices"
     const val ENTRY = "entry?id={id}"
     const val PLAYLIST = "playlist/{id}"
 
@@ -62,9 +69,13 @@ fun LinguaNavHost(nav: NavHostController = rememberNavController()) {
     val backStack by nav.currentBackStackEntryAsState()
     val currentRoute = backStack?.destination?.route
     val showBar = topLevel.any { it.route == currentRoute }
+    val showMini = currentRoute !in setOf(Routes.PLAYER, Routes.ENTRY, Routes.IMPORT, Routes.VOICES)
+    val player = appContainer().player
 
     Scaffold(
         bottomBar = {
+            Column {
+            if (showMini) MiniPlayer(player, onOpen = { nav.navigate(Routes.PLAYER) { launchSingleTop = true } })
             if (showBar) {
                 NavigationBar {
                     topLevel.forEach { item ->
@@ -77,6 +88,7 @@ fun LinguaNavHost(nav: NavHostController = rememberNavController()) {
                     }
                 }
             }
+            }
         },
     ) { padding ->
         NavHost(nav, startDestination = Routes.HOME, modifier = Modifier.padding(bottom = padding.calculateBottomPadding())) {
@@ -86,7 +98,14 @@ fun LinguaNavHost(nav: NavHostController = rememberNavController()) {
                     onOpenPlaylists = { nav.navigateTopLevel(Routes.PLAYLISTS) },
                     onOpenPlaylist = { nav.navigate(Routes.playlist(it)) },
                     onImport = { nav.navigate(Routes.IMPORT) },
+                    onOpenPlayer = { nav.navigate(Routes.PLAYER) { launchSingleTop = true } },
                 )
+            }
+            composable(Routes.PLAYER) {
+                PlayerScreen(onBack = { nav.popBackStack() }, onOpenVoices = { nav.navigate(Routes.VOICES) })
+            }
+            composable(Routes.VOICES) {
+                TtsSettingsScreen(onBack = { nav.popBackStack() })
             }
             composable(Routes.IMPORT) {
                 ImportScreen(
@@ -100,13 +119,14 @@ fun LinguaNavHost(nav: NavHostController = rememberNavController()) {
                     onAddEntry = { nav.navigate(Routes.entry()) },
                     onManageTags = { nav.navigate(Routes.TAGS) },
                     onImport = { nav.navigate(Routes.IMPORT) },
+                    onOpenPlayer = { nav.navigate(Routes.PLAYER) { launchSingleTop = true } },
                 )
             }
             composable(Routes.PLAYLISTS) {
                 PlaylistsScreen(onOpenPlaylist = { nav.navigate(Routes.playlist(it)) })
             }
             composable(Routes.SETTINGS) {
-                SettingsScreen(onManageTags = { nav.navigate(Routes.TAGS) })
+                SettingsScreen(onManageTags = { nav.navigate(Routes.TAGS) }, onOpenVoices = { nav.navigate(Routes.VOICES) })
             }
             composable(Routes.TAGS) {
                 TagsScreen(onBack = { nav.popBackStack() })
@@ -128,6 +148,7 @@ fun LinguaNavHost(nav: NavHostController = rememberNavController()) {
                     playlistId = entry.arguments?.getLong("id") ?: 0L,
                     onBack = { nav.popBackStack() },
                     onOpenEntry = { nav.navigate(Routes.entry(it)) },
+                    onOpenPlayer = { nav.navigate(Routes.PLAYER) { launchSingleTop = true } },
                 )
             }
         }

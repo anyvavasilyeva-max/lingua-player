@@ -132,6 +132,9 @@ class EntryRepository(
         }
     }
 
+    fun observeDontRemember(entryId: Long): Flow<Boolean> =
+        entryDao.observeHasSystemTag(entryId, TagEntity.SYSTEM_DONT_REMEMBER)
+
     /** Кнопка «Не помню»: тег ищется по системному ключу, а не по имени. */
     suspend fun toggleDontRemember(entryId: Long): Boolean {
         val tag = tagDao.getBySystemKey(TagEntity.SYSTEM_DONT_REMEMBER)
