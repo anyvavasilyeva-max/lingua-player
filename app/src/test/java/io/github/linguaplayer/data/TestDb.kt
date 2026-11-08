@@ -6,6 +6,7 @@ import io.github.linguaplayer.data.repo.EntryRepository
 import io.github.linguaplayer.data.repo.LanguagePairRepository
 import io.github.linguaplayer.data.repo.PlaylistRepository
 import io.github.linguaplayer.data.repo.TagRepository
+import kotlinx.coroutines.flow.first
 
 /** Набор репозиториев поверх in-memory БД для тестов. */
 class TestDb {
@@ -19,3 +20,6 @@ class TestDb {
 
     fun close() = db.close()
 }
+
+suspend fun io.github.linguaplayer.data.repo.TagRepository.observeWithCountsOnce() =
+    observeWithCounts().first()

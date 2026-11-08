@@ -26,6 +26,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import io.github.linguaplayer.R
 import io.github.linguaplayer.ui.home.HomeScreen
+import io.github.linguaplayer.ui.importer.ImportScreen
 import io.github.linguaplayer.ui.library.EntryEditScreen
 import io.github.linguaplayer.ui.library.LibraryScreen
 import io.github.linguaplayer.ui.playlists.PlaylistDetailScreen
@@ -39,6 +40,7 @@ object Routes {
     const val PLAYLISTS = "playlists"
     const val SETTINGS = "settings"
     const val TAGS = "tags"
+    const val IMPORT = "import"
     const val ENTRY = "entry?id={id}"
     const val PLAYLIST = "playlist/{id}"
 
@@ -83,6 +85,13 @@ fun LinguaNavHost(nav: NavHostController = rememberNavController()) {
                     onOpenLibrary = { nav.navigateTopLevel(Routes.LIBRARY) },
                     onOpenPlaylists = { nav.navigateTopLevel(Routes.PLAYLISTS) },
                     onOpenPlaylist = { nav.navigate(Routes.playlist(it)) },
+                    onImport = { nav.navigate(Routes.IMPORT) },
+                )
+            }
+            composable(Routes.IMPORT) {
+                ImportScreen(
+                    onBack = { nav.popBackStack() },
+                    onFinished = { nav.popBackStack(); nav.navigateTopLevel(Routes.LIBRARY) },
                 )
             }
             composable(Routes.LIBRARY) {
@@ -90,6 +99,7 @@ fun LinguaNavHost(nav: NavHostController = rememberNavController()) {
                     onOpenEntry = { nav.navigate(Routes.entry(it)) },
                     onAddEntry = { nav.navigate(Routes.entry()) },
                     onManageTags = { nav.navigate(Routes.TAGS) },
+                    onImport = { nav.navigate(Routes.IMPORT) },
                 )
             }
             composable(Routes.PLAYLISTS) {

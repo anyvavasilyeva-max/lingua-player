@@ -1,6 +1,8 @@
 package io.github.linguaplayer.ui.library
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -10,10 +12,17 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.Label
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Clear
-import androidx.compose.material.icons.automirrored.outlined.Label
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.FileUpload
+import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.NewLabel
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.SelectAll
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
@@ -23,10 +32,17 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -38,12 +54,16 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.linguaplayer.AppContainer
 import io.github.linguaplayer.R
 import io.github.linguaplayer.data.db.EntryFilter
+import io.github.linguaplayer.data.db.PlaylistEntity
 import io.github.linguaplayer.data.db.TagEntity
 import io.github.linguaplayer.data.db.TagMatchMode
 import io.github.linguaplayer.data.db.TypeFilter
 import io.github.linguaplayer.data.repo.EntryWithTags
+import io.github.linguaplayer.ui.components.ConfirmDialog
 import io.github.linguaplayer.ui.components.EmptyState
 import io.github.linguaplayer.ui.components.EntryRow
+import io.github.linguaplayer.ui.components.PlaylistPickerDialog
+import io.github.linguaplayer.ui.components.TagPickerDialog
 import io.github.linguaplayer.ui.components.appContainer
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
@@ -54,6 +74,7 @@ import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 data class LibraryFilterState(
     val text: String = "",
@@ -62,9 +83,17 @@ data class LibraryFilterState(
     val tagMode: TagMatchMode = TagMatchMode.ANY,
 )
 
+/** Сообщение для snackbar после массовой операции. */
+sealed interface LibraryMessage {
+    data class TagsUpdated(val count: Int) : LibraryMessage
+    data class AddedToPlaylist(val name: String) : LibraryMessage
+}
+
 @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
-class LibraryViewModel(c: AppContainer) : ViewModel() {
+class LibraryViewModel(private val c: AppContainer) : ViewModel() {
     val filter = MutableStateFlow(LibraryFilterState())
+    val selected = MutableStateFlow<Set<Long>>(emptySet())
+    val message = MutableStateFlow<LibraryMessage?>(null)
 
     val tags = c.tags.observeAll().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
@@ -84,7 +113,49 @@ class LibraryViewModel(c: AppContainer) : ViewModel() {
         it.copy(tagMode = if (it.tagMode == TagMatchMode.ANY) TagMatchMode.ALL else TagMatchMode.ANY)
     }
     fun clearTags() = filter.update { it.copy(tagIds = emptySet()) }
+
+    // --- Выбор нескольких записей ---
+    fun toggleSelected(id: Long) = selected.update { if (id in it) it - id else it + id }
+    fun selectAllVisible() = selected.update { entries.value.orEmpty().map { e -> e.entry.id }.toSet() }
+    fun clearSelection() { selected.value = emptySet() }
+
+    fun addTags(tagIds: Set<Long>) = viewModelScope.launch {
+        val ids = selected.value
+        c.entries.addTags(ids, tagIds)
+        message.value = LibraryMessage.TagsUpdated(ids.size)
+        clearSelection()
+    }
+
+    fun removeTags(tagIds: Set<Long>) = viewModelScope.launch {
+        val ids = selected.value
+        c.entries.removeTags(ids, tagIds)
+        message.value = LibraryMessage.TagsUpdated(ids.size)
+        clearSelection()
+    }
+
+    fun addToPlaylist(p: PlaylistEntity) = viewModelScope.launch {
+        // Порядок добавления — как в текущем списке библиотеки.
+        val order = entries.value.orEmpty().map { it.entry.id }.filter { it in selected.value }
+        c.playlists.addEntries(p.id, order)
+        message.value = LibraryMessage.AddedToPlaylist(p.name)
+        clearSelection()
+    }
+
+    fun deleteSelected() = viewModelScope.launch {
+        c.entries.delete(selected.value)
+        clearSelection()
+    }
+
+    fun createTag(name: String, onCreated: (Long) -> Unit) = viewModelScope.launch {
+        runCatching { c.tags.getOrCreate(name) }.getOrNull()?.let { onCreated(it.id) }
+    }
+
+    suspend fun normalPlaylists() = c.playlists.normalPlaylists()
+
+    fun consumeMessage() { message.value = null }
 }
+
+private enum class LibraryDialog { ADD_TAGS, REMOVE_TAGS, PLAYLIST, DELETE }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -92,31 +163,92 @@ fun LibraryScreen(
     onOpenEntry: (Long) -> Unit,
     onAddEntry: () -> Unit,
     onManageTags: () -> Unit,
+    onImport: () -> Unit,
 ) {
     val c = appContainer()
     val vm: LibraryViewModel = viewModel { LibraryViewModel(c) }
     val filter by vm.filter.collectAsStateWithLifecycle()
     val entries by vm.entries.collectAsStateWithLifecycle()
     val tags by vm.tags.collectAsStateWithLifecycle()
+    val selected by vm.selected.collectAsStateWithLifecycle()
+    val message by vm.message.collectAsStateWithLifecycle()
+    val selecting = selected.isNotEmpty()
+    var dialog by remember { mutableStateOf<LibraryDialog?>(null) }
+    var playlists by remember { mutableStateOf<List<PlaylistEntity>>(emptyList()) }
+    var menuOpen by remember { mutableStateOf(false) }
+    val snackbar = remember { SnackbarHostState() }
+
+    BackHandler(enabled = selecting) { vm.clearSelection() }
+
+    val messageText = when (val m = message) {
+        is LibraryMessage.TagsUpdated -> stringResource(R.string.selection_done_tags, m.count)
+        is LibraryMessage.AddedToPlaylist -> stringResource(R.string.selection_done_playlist, m.name)
+        null -> null
+    }
+    LaunchedEffect(messageText) {
+        if (messageText != null) { vm.consumeMessage(); snackbar.showSnackbar(messageText) }
+    }
+    LaunchedEffect(dialog) {
+        if (dialog == LibraryDialog.PLAYLIST) playlists = vm.normalPlaylists()
+    }
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.nav_library)) },
-                actions = {
-                    IconButton(onClick = onManageTags) {
-                        Icon(Icons.AutoMirrored.Outlined.Label, contentDescription = stringResource(R.string.library_tags))
-                    }
-                },
-            )
+            if (selecting) {
+                TopAppBar(
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                    navigationIcon = {
+                        IconButton(onClick = vm::clearSelection) { Icon(Icons.Outlined.Close, stringResource(R.string.action_cancel)) }
+                    },
+                    title = { Text(stringResource(R.string.selection_count, selected.size), maxLines = 1, style = MaterialTheme.typography.titleMedium) },
+                    actions = {
+                        IconButton(onClick = vm::selectAllVisible) { Icon(Icons.Outlined.SelectAll, stringResource(R.string.selection_all)) }
+                        IconButton(onClick = { dialog = LibraryDialog.ADD_TAGS }) {
+                            Icon(Icons.Outlined.NewLabel, stringResource(R.string.selection_add_tags))
+                        }
+                        Box {
+                            IconButton(onClick = { menuOpen = true }) { Icon(Icons.Outlined.MoreVert, stringResource(R.string.action_more)) }
+                            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.selection_remove_tags)) },
+                                    onClick = { menuOpen = false; dialog = LibraryDialog.REMOVE_TAGS },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.selection_add_playlist)) },
+                                    onClick = { menuOpen = false; dialog = LibraryDialog.PLAYLIST },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.action_delete)) },
+                                    onClick = { menuOpen = false; dialog = LibraryDialog.DELETE },
+                                )
+                            }
+                        }
+                    },
+                )
+            } else {
+                TopAppBar(
+                    title = { Text(stringResource(R.string.nav_library)) },
+                    actions = {
+                        IconButton(onClick = onImport) {
+                            Icon(Icons.Outlined.FileUpload, contentDescription = stringResource(R.string.import_action))
+                        }
+                        IconButton(onClick = onManageTags) {
+                            Icon(Icons.AutoMirrored.Outlined.Label, contentDescription = stringResource(R.string.library_tags))
+                        }
+                    },
+                )
+            }
         },
         floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = onAddEntry,
-                icon = { Icon(Icons.Outlined.Add, null) },
-                text = { Text(stringResource(R.string.library_add)) },
-            )
+            if (!selecting) {
+                ExtendedFloatingActionButton(
+                    onClick = onAddEntry,
+                    icon = { Icon(Icons.Outlined.Add, null) },
+                    text = { Text(stringResource(R.string.library_add)) },
+                )
+            }
         },
+        snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
             OutlinedTextField(
@@ -138,9 +270,42 @@ fun LibraryScreen(
             when {
                 list == null -> Unit
                 list.isEmpty() -> EmptyState(stringResource(R.string.library_empty))
-                else -> EntryList(list, onOpenEntry)
+                else -> EntryList(
+                    list,
+                    selected,
+                    onClick = { id -> if (selecting) vm.toggleSelected(id) else onOpenEntry(id) },
+                    onLongClick = vm::toggleSelected,
+                )
             }
         }
+    }
+
+    when (dialog) {
+        LibraryDialog.ADD_TAGS -> TagPickerDialog(
+            title = stringResource(R.string.selection_add_tags),
+            tags = tags,
+            onDismiss = { dialog = null },
+            onConfirm = { vm.addTags(it); dialog = null },
+            onCreateTag = vm::createTag,
+        )
+        LibraryDialog.REMOVE_TAGS -> TagPickerDialog(
+            title = stringResource(R.string.selection_remove_tags),
+            tags = tags,
+            onDismiss = { dialog = null },
+            onConfirm = { vm.removeTags(it); dialog = null },
+        )
+        LibraryDialog.PLAYLIST -> PlaylistPickerDialog(
+            playlists = playlists,
+            onDismiss = { dialog = null },
+            onPick = { vm.addToPlaylist(it); dialog = null },
+        )
+        LibraryDialog.DELETE -> ConfirmDialog(
+            title = stringResource(R.string.confirm_delete_title),
+            text = stringResource(R.string.selection_delete_confirm, selected.size),
+            onDismiss = { dialog = null },
+            onConfirm = { vm.deleteSelected(); dialog = null },
+        )
+        null -> Unit
     }
 }
 
@@ -180,18 +345,29 @@ private fun FilterBar(filter: LibraryFilterState, tags: List<TagEntity>, vm: Lib
 }
 
 @Composable
-private fun EntryList(list: List<EntryWithTags>, onOpenEntry: (Long) -> Unit) {
+private fun EntryList(
+    list: List<EntryWithTags>,
+    selected: Set<Long>,
+    onClick: (Long) -> Unit,
+    onLongClick: (Long) -> Unit,
+) {
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 88.dp)) {
         item {
             Text(
-                pluralStringResource(R.plurals.entries_count, list.size, list.size),
+                pluralStringResource(R.plurals.entries_count, list.size, list.size) +
+                    if (selected.isEmpty()) " · " + stringResource(R.string.selection_hint) else "",
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
             )
         }
         items(list, key = { it.entry.id }) { item ->
-            EntryRow(item, onClick = { onOpenEntry(item.entry.id) })
+            EntryRow(
+                item,
+                onClick = { onClick(item.entry.id) },
+                selected = item.entry.id in selected,
+                onLongClick = { onLongClick(item.entry.id) },
+            )
         }
     }
 }

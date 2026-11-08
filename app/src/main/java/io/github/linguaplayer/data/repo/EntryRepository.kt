@@ -113,6 +113,14 @@ class EntryRepository(
         }
     }
 
+    /** Массово снимает теги с выбранных записей. */
+    suspend fun removeTags(entryIds: Collection<Long>, tagIds: Collection<Long>) {
+        if (entryIds.isEmpty() || tagIds.isEmpty()) return
+        db.withTransaction {
+            entryIds.chunked(400).forEach { chunk -> entryDao.deleteTagLinks(chunk, tagIds.toList()) }
+        }
+    }
+
     /** Переключает тег у записи. Возвращает true, если тег теперь установлен. */
     suspend fun toggleTag(entryId: Long, tagId: Long): Boolean = db.withTransaction {
         if (entryDao.hasTag(entryId, tagId) > 0) {

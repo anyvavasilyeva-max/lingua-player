@@ -35,6 +35,11 @@ interface LanguagePairDao {
     suspend fun delete(id: Long)
 }
 
+data class EntryKey(
+    val id: Long,
+    @ColumnInfo(name = "source_key") val sourceKey: String,
+)
+
 @Dao
 interface EntryDao {
     @Insert
@@ -55,6 +60,13 @@ interface EntryDao {
     @Query("SELECT * FROM entries WHERE pair_id = :pairId AND source_key = :sourceKey ORDER BY id")
     suspend fun findBySourceKey(pairId: Long, sourceKey: String): List<EntryEntity>
 
+    @Query("SELECT * FROM entries WHERE id IN (:ids)")
+    suspend fun getByIds(ids: List<Long>): List<EntryEntity>
+
+    /** Ключи всех записей пары — для поиска дубликатов при импорте. */
+    @Query("SELECT id, source_key FROM entries WHERE pair_id = :pairId ORDER BY id")
+    suspend fun getKeys(pairId: Long): List<EntryKey>
+
     @Query("SELECT COUNT(*) FROM entries")
     fun observeCount(): Flow<Int>
 
@@ -74,6 +86,9 @@ interface EntryDao {
 
     @Query("DELETE FROM entry_tags WHERE entry_id = :entryId AND tag_id = :tagId")
     suspend fun deleteTagLink(entryId: Long, tagId: Long)
+
+    @Query("DELETE FROM entry_tags WHERE entry_id IN (:entryIds) AND tag_id IN (:tagIds)")
+    suspend fun deleteTagLinks(entryIds: List<Long>, tagIds: List<Long>)
 
     @Query("DELETE FROM entry_tags WHERE entry_id = :entryId")
     suspend fun clearTags(entryId: Long)

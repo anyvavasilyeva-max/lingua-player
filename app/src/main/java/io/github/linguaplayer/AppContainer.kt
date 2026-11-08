@@ -4,10 +4,14 @@ import android.content.Context
 import io.github.linguaplayer.data.db.AppDatabase
 import io.github.linguaplayer.data.db.LanguagePairEntity
 import io.github.linguaplayer.data.repo.EntryRepository
+import io.github.linguaplayer.data.repo.ImportRepository
 import io.github.linguaplayer.data.repo.LanguagePairRepository
 import io.github.linguaplayer.data.repo.PlaylistRepository
 import io.github.linguaplayer.data.repo.SettingsRepository
 import io.github.linguaplayer.data.repo.TagRepository
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 
@@ -21,6 +25,10 @@ class AppContainer(context: Context) {
     val tags = TagRepository(database)
     val playlists = PlaylistRepository(database, entries)
     val languagePairs = LanguagePairRepository(database)
+    val importer = ImportRepository(database, tags)
+
+    /** Область для долгих операций (импорт), которые не должны прерываться при уходе с экрана. */
+    val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     val settings = SettingsRepository(context)
 
     /** Активная языковая пара: выбранная в настройках, иначе первая из существующих. */

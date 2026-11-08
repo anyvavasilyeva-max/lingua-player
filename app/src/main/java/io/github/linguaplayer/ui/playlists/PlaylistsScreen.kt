@@ -34,6 +34,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.linguaplayer.AppContainer
 import io.github.linguaplayer.R
 import io.github.linguaplayer.data.db.PlaylistEntity
+import io.github.linguaplayer.data.db.PlaylistKind
+import io.github.linguaplayer.data.repo.SmartRules
 import io.github.linguaplayer.ui.components.ConfirmDialog
 import io.github.linguaplayer.ui.components.EmptyState
 import io.github.linguaplayer.ui.components.TextInputDialog
@@ -48,7 +50,12 @@ class PlaylistsViewModel(private val c: AppContainer) : ViewModel() {
     val playlists = c.playlists.observeAll().map { it }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
-    fun create(name: String) = viewModelScope.launch { runCatching { c.playlists.create(name) } }
+    val pairs = c.languagePairs.observeAll().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val tags = c.tags.observeAll().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun create(name: String, kind: PlaylistKind, rules: SmartRules?, onCreated: (Long) -> Unit) = viewModelScope.launch {
+        runCatching { c.playlists.create(name, kind, rules) }.onSuccess(onCreated)
+    }
     fun rename(id: Long, name: String) = viewModelScope.launch { runCatching { c.playlists.rename(id, name) } }
     fun delete(id: Long) = viewModelScope.launch { c.playlists.delete(id) }
 }
@@ -59,6 +66,8 @@ fun PlaylistsScreen(onOpenPlaylist: (Long) -> Unit) {
     val c = appContainer()
     val vm: PlaylistsViewModel = viewModel { PlaylistsViewModel(c) }
     val playlists by vm.playlists.collectAsStateWithLifecycle()
+    val pairs by vm.pairs.collectAsStateWithLifecycle()
+    val tags by vm.tags.collectAsStateWithLifecycle()
     var showCreate by remember { mutableStateOf(false) }
     var renaming by remember { mutableStateOf<PlaylistEntity?>(null) }
     var deleting by remember { mutableStateOf<PlaylistEntity?>(null) }
@@ -95,11 +104,15 @@ fun PlaylistsScreen(onOpenPlaylist: (Long) -> Unit) {
     }
 
     if (showCreate) {
-        TextInputDialog(
+        PlaylistEditorDialog(
             title = stringResource(R.string.playlist_new),
-            confirmText = stringResource(R.string.action_create),
+            pairs = pairs,
+            tags = tags,
             onDismiss = { showCreate = false },
-            onConfirm = { vm.create(it); showCreate = false },
+            onConfirm = { name, kind, rules ->
+                showCreate = false
+                vm.create(name, kind, rules) { id -> if (kind == PlaylistKind.SMART) onOpenPlaylist(id) }
+            },
         )
     }
     renaming?.let { p ->

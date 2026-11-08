@@ -4,12 +4,18 @@ import android.graphics.Bitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.isDialog
+import kotlinx.coroutines.flow.first
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -32,25 +38,14 @@ import java.io.File
 class AppSmokeTest {
     @get:Rule
     val rule = createAndroidComposeRule<MainActivity>()
+    private val ui by lazy { UiTestHelper(rule) }
+    private fun waitText(t: String) = ui.waitText(t)
+    private fun click(t: String) = ui.click(t)
+    private fun shot(n: String) = ui.shot(n)
+    private fun realWait(c: () -> Boolean) = ui.realWait(condition = c)
 
-    private fun shot(name: String) {
-        val dir = System.getProperty("lingua.screenshots") ?: return
-        rule.waitForIdle()
-        val bmp = rule.onRoot().captureToImage().asAndroidBitmap()
-        File(dir).mkdirs()
-        File(dir, "$name.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
-    }
 
-    /** Room работает в фоновых потоках, поэтому ждём появления текста явно. */
-    private fun waitText(text: String) {
-        rule.waitUntil(10_000) { rule.onAllNodesWithText(text, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
-    }
 
-    /** Клик по элементу с текстом (после того как он появился). */
-    private fun click(text: String) {
-        waitText(text)
-        rule.onAllNodesWithText(text, useUnmergedTree = true)[0].performClick()
-    }
 
     @Test
     fun addEntryCreateTagAndPlaylist() {
@@ -61,7 +56,7 @@ class AppSmokeTest {
         click("Плейлисты")
         click("Новый плейлист")
         rule.onNode(hasSetTextAction()).performTextInput("Кухня")
-        click("Создать")
+        click("Сохранить")
         rule.waitForIdle()
         waitText("Кухня")
 
@@ -96,4 +91,55 @@ class AppSmokeTest {
         waitText("Корейский → Русский")
         shot("05_settings")
     }
+
+    @Test
+    fun massTaggingAndSmartPlaylist() {
+        val c = (rule.activity.application as io.github.linguaplayer.LinguaApp).container
+        kotlinx.coroutines.runBlocking {
+            val pair = c.languagePairs.getAll().first().id
+            listOf("포크" to "Вилка", "숟가락" to "Ложка").forEach { (s, t) ->
+                c.entries.save(io.github.linguaplayer.data.repo.EntryDraft(pairId = pair, source = s, translation = t, type = io.github.linguaplayer.data.db.EntryType.WORD, tagIds = emptySet()))
+            }
+            c.entries.save(io.github.linguaplayer.data.repo.EntryDraft(pairId = pair, source = "설거지를 하다", translation = "Мыть посуду", type = io.github.linguaplayer.data.db.EntryType.PHRASE, tagIds = emptySet()))
+        }
+        click("Библиотека")
+        waitText("설거지를 하다")
+        rule.onAllNodesWithText("설거지를 하다", useUnmergedTree = true)[0].performTouchInput { longClick() }
+        waitText("Выбрано: 1")
+        click("숟가락") // в режиме выбора обычное нажатие добавляет запись
+        waitText("Выбрано: 2")
+        rule.onNodeWithContentDescription("Выбрать все").performClick()
+        waitText("Выбрано: 3")
+        shot("06_library_selection")
+        rule.onNodeWithContentDescription("Добавить теги").performClick()
+        rule.onNode(hasSetTextAction() and hasAnyAncestor(isDialog())).performTextInput("кухня")
+        rule.onNodeWithContentDescription("Создать").performClick()
+        // Ждём строку нового тега в списке диалога (не текст в поле ввода).
+        realWait {
+            rule.onAllNodes(hasText("кухня") and hasAnyAncestor(isDialog()) and !hasSetTextAction(), useUnmergedTree = true)
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+        click("Сохранить")
+        realWait {
+            kotlinx.coroutines.runBlocking {
+                c.tags.observeWithCounts().first().any { it.tag.name == "кухня" && it.usageCount == 3 }
+            }
+        }
+        waitText("#кухня")
+
+        // Умный плейлист «кухня — фразы»
+        click("Плейлисты")
+        click("Новый плейлист")
+        rule.onNode(hasSetTextAction()).performTextInput("Кухня — фразы")
+        click("Умный")
+        click("Фразы")
+        click("#кухня")
+        shot("07_smart_editor")
+        click("Сохранить")
+        waitText("설거지를 하다")
+        shot("08_smart_playlist")
+        val count = rule.onAllNodesWithText("포크", useUnmergedTree = true).fetchSemanticsNodes().size
+        org.junit.Assert.assertEquals(0, count)
+    }
 }
+

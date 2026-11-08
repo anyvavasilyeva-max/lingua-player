@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -24,6 +25,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -35,6 +37,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.linguaplayer.AppContainer
 import io.github.linguaplayer.R
 import io.github.linguaplayer.data.db.PlaylistKind
+import io.github.linguaplayer.data.repo.SmartRules
 import io.github.linguaplayer.ui.components.EmptyState
 import io.github.linguaplayer.ui.components.EntryRow
 import io.github.linguaplayer.ui.components.appContainer
@@ -50,6 +53,18 @@ class PlaylistDetailViewModel(private val c: AppContainer, private val id: Long)
         viewModelScope.launch { c.playlists.markOpened(id) }
     }
 
+    val pairs = c.languagePairs.observeAll().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val tags = c.tags.observeAll().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    suspend fun smartTagIds() = c.playlists.smartTagIds(id)
+
+    fun updateSmart(name: String, rules: SmartRules) = viewModelScope.launch {
+        runCatching {
+            c.playlists.rename(id, name)
+            c.playlists.updateSmartRules(id, rules)
+        }
+    }
+
     fun move(from: Int, to: Int) = viewModelScope.launch { c.playlists.move(id, from, to) }
     fun remove(entryId: Long) = viewModelScope.launch { c.playlists.removeEntries(id, listOf(entryId)) }
 }
@@ -61,6 +76,10 @@ fun PlaylistDetailScreen(playlistId: Long, onBack: () -> Unit, onOpenEntry: (Lon
     val vm: PlaylistDetailViewModel = viewModel(key = "playlist-$playlistId") { PlaylistDetailViewModel(c, playlistId) }
     val playlist by vm.playlist.collectAsStateWithLifecycle()
     val entries by vm.entries.collectAsStateWithLifecycle()
+    val pairs by vm.pairs.collectAsStateWithLifecycle()
+    val tags by vm.tags.collectAsStateWithLifecycle()
+    var editRules by remember { mutableStateOf<SmartRules?>(null) }
+    val scope = rememberCoroutineScope()
     val normal = playlist?.kind == PlaylistKind.NORMAL
 
     Scaffold(
@@ -80,6 +99,14 @@ fun PlaylistDetailScreen(playlistId: Long, onBack: () -> Unit, onOpenEntry: (Lon
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, stringResource(R.string.action_back)) }
+                },
+                actions = {
+                    val p = playlist
+                    if (p != null && p.kind == PlaylistKind.SMART) {
+                        IconButton(onClick = {
+                            scope.launch { editRules = SmartRules(p.pairId, p.smartType, vm.smartTagIds(), p.smartTagMode) }
+                        }) { Icon(Icons.Outlined.Tune, stringResource(R.string.smart_edit)) }
+                    }
                 },
             )
         },
@@ -111,6 +138,20 @@ fun PlaylistDetailScreen(playlistId: Long, onBack: () -> Unit, onOpenEntry: (Lon
                 }
             }
         }
+    }
+
+    editRules?.let { rules ->
+        PlaylistEditorDialog(
+            title = stringResource(R.string.smart_edit),
+            pairs = pairs,
+            tags = tags,
+            initialName = playlist?.name.orEmpty(),
+            initialKind = PlaylistKind.SMART,
+            initialRules = rules,
+            kindEditable = false,
+            onDismiss = { editRules = null },
+            onConfirm = { name, _, r -> editRules = null; if (r != null) vm.updateSmart(name, r) },
+        )
     }
 }
 
