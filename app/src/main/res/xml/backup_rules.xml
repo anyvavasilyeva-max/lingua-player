@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Системная резервная копия Android (Google). Собственный экспорт/бэкап — на этапе 5. -->
+<full-backup-content>
+    <include domain="database" path="lingua_player.db" />
+    <include domain="sharedpref" path="." />
+    <include domain="file" path="datastore/" />
+</full-backup-content>

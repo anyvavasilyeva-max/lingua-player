@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Тема окна до запуска Compose. Цвета интерфейса задаются в ui/theme/Theme.kt -->
+    <style name="Theme.LinguaPlayer" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/window_background</item>
+    </style>
+</resources>

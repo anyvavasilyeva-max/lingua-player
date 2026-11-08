@@ -1,0 +1,23 @@
+# Gradle / Android Studio
+.gradle/
+build/
+/local.properties
+/.idea/
+*.iml
+.DS_Store
+/captures
+.externalNativeBuild/
+.cxx/
+.kotlin/
+
+# Подписи и секреты — никогда не коммитить
+*.jks
+*.keystore
+keystore.properties
+signing.properties
+
+# Личные словари пользователя (кладите их сюда, они не попадут в git)
+/private/
+
+# Готовые сборки для передачи (не коммитятся)
+/dist/

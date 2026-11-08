@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Все тексты интерфейса. Язык по умолчанию — русский.
+  Чтобы добавить перевод, создайте values-<код>/strings.xml (например, values-en) с теми же ключами.
+-->
+<resources>
+    <string name="app_name">Lingua Player</string>
+    <string name="tag_dont_remember">Не помню</string>
+
+    <!-- Навигация -->
+    <string name="nav_home">Главная</string>
+    <string name="nav_library">Библиотека</string>
+    <string name="nav_playlists">Плейлисты</string>
+    <string name="nav_settings">Настройки</string>
+
+    <!-- Общие -->
+    <string name="action_save">Сохранить</string>
+    <string name="action_cancel">Отмена</string>
+    <string name="action_delete">Удалить</string>
+    <string name="action_rename">Переименовать</string>
+    <string name="action_create">Создать</string>
+    <string name="action_add">Добавить</string>
+    <string name="action_back">Назад</string>
+    <string name="action_more">Ещё</string>
+    <string name="field_name">Название</string>
+    <string name="confirm_delete_title">Удалить?</string>
+
+    <!-- Ошибки -->
+    <string name="error_empty_field">Заполните обязательные поля</string>
+    <string name="error_tag_exists">Тег с таким названием уже есть</string>
+    <string name="error_system_tag">Системный тег нельзя удалить</string>
+    <string name="error_pair_exists">Такая языковая пара уже есть</string>
+    <string name="error_pair_invalid">Неверный код языка (нужен формат BCP 47, например ko-KR)</string>
+    <string name="error_pair_in_use">В этой языковой паре есть записи — её нельзя удалить</string>
+    <string name="error_not_found">Запись не найдена</string>
+    <string name="error_unknown">Ошибка: %1$s</string>
+
+    <!-- Главная -->
+    <string name="home_greeting">Что послушаем?</string>
+    <string name="home_library_card">Вся библиотека</string>
+    <string name="home_recent">Недавно открытые</string>
+    <string name="home_recent_empty">Здесь появятся плейлисты, которые вы открывали</string>
+    <string name="home_all_playlists">Все плейлисты</string>
+    <string name="home_empty_library">Библиотека пуста. Добавьте первую запись в разделе «Библиотека».</string>
+    <plurals name="entries_count">
+        <item quantity="one">%d запись</item>
+        <item quantity="few">%d записи</item>
+        <item quantity="many">%d записей</item>
+        <item quantity="other">%d записи</item>
+    </plurals>
+
+    <!-- Библиотека -->
+    <string name="library_search">Поиск по слову или переводу</string>
+    <string name="library_empty">Ничего не найдено</string>
+    <string name="library_add">Новая запись</string>
+    <string name="library_tags">Теги</string>
+    <string name="filter_all">Все</string>
+    <string name="filter_words">Слова</string>
+    <string name="filter_phrases">Фразы</string>
+    <string name="filter_tag_any">Любой из тегов</string>
+    <string name="filter_tag_all">Все теги</string>
+    <string name="filter_clear">Сбросить</string>
+    <string name="type_word">слово</string>
+    <string name="type_phrase">фраза</string>
+
+    <!-- Редактор записи -->
+    <string name="entry_new">Новая запись</string>
+    <string name="entry_edit">Редактирование</string>
+    <string name="entry_source">Слово или фраза (%1$s)</string>
+    <string name="entry_translation">Перевод (%1$s)</string>
+    <string name="entry_translation_hint">Несколько вариантов можно разделить «;»</string>
+    <string name="entry_type">Тип</string>
+    <string name="entry_tags">Теги</string>
+    <string name="entry_playlists">Плейлисты</string>
+    <string name="entry_no_playlists">Плейлистов пока нет</string>
+    <string name="entry_new_tag">Новый тег</string>
+    <string name="entry_delete_confirm">Запись будет удалена из библиотеки и из всех плейлистов.</string>
+    <string name="entry_pair">Языковая пара: %1$s</string>
+
+    <!-- Плейлисты -->
+    <string name="playlists_empty">Плейлистов пока нет. Создайте первый.</string>
+    <string name="playlist_new">Новый плейлист</string>
+    <string name="playlist_smart">Умный</string>
+    <string name="playlist_delete_confirm">Плейлист «%1$s» будет удалён. Слова останутся в библиотеке.</string>
+    <string name="playlist_empty">В плейлисте нет записей. Откройте запись в библиотеке и отметьте этот плейлист.</string>
+    <string name="playlist_smart_empty">Нет записей, подходящих под условия умного плейлиста.</string>
+    <string name="playlist_move_up">Выше</string>
+    <string name="playlist_move_down">Ниже</string>
+    <string name="playlist_remove_entry">Убрать из плейлиста</string>
+
+    <!-- Теги -->
+    <string name="tags_title">Теги</string>
+    <string name="tags_empty">Тегов пока нет</string>
+    <string name="tag_system">системный</string>
+    <string name="tag_delete_confirm">Тег «%1$s» будет снят со всех записей. Сами записи останутся.</string>
+    <string name="tag_new">Новый тег</string>
+
+    <!-- Настройки -->
+    <string name="settings_pairs">Языковые пары</string>
+    <string name="settings_add_pair">Добавить пару</string>
+    <string name="settings_pair_source">Изучаемый язык (BCP 47)</string>
+    <string name="settings_pair_target">Язык перевода (BCP 47)</string>
+    <string name="settings_pair_hint">Например: ko-KR, ru-RU, en-US, ja-JP, zh-CN, de-DE</string>
+    <string name="settings_manage_tags">Управление тегами</string>
+    <string name="settings_about">О приложении</string>
+    <string name="settings_version">Версия %1$s</string>
+</resources>
