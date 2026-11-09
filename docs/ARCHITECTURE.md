@@ -29,7 +29,7 @@ io.github.linguaplayer
 | `player/service/` | 4 | `MediaSessionService` + собственный `SimpleBasePlayer`, audio focus, Bluetooth |
 | `backup/` | 5 | Экспорт CSV/XLSX, резервная копия JSON (версионированный формат) |
 
-## База данных (Room, версия схемы 1)
+## База данных (Room, версия схемы 2)
 
 ```
 language_pairs (id, source_lang, target_lang, created_at)     UNIQUE(source_lang, target_lang)
@@ -39,7 +39,7 @@ tags           (id, name, name_key UNIQUE, system_key UNIQUE NULL, created_at)
 entry_tags     (entry_id → entries CASCADE, tag_id → tags CASCADE)          PK(entry_id, tag_id)
 playlists      (id, name, kind normal|smart, pair_id NULL → SET NULL,
                 smart_type all|word|phrase, smart_tag_mode any|all,
-                created_at, updated_at, last_opened_at)
+                created_at, updated_at, last_opened_at, cover_path)   ← cover_path: v2
 playlist_entries (playlist_id → CASCADE, entry_id → CASCADE, position)      PK(playlist_id, entry_id)
 smart_playlist_tags (playlist_id → CASCADE, tag_id → CASCADE)
 ```
@@ -61,7 +61,9 @@ smart_playlist_tags (playlist_id → CASCADE, tag_id → CASCADE)
   фильтры библиотеки (пара + тип + теги «любой»/«все»).
 - **Перечисления** хранятся строковыми кодами (`word`, `phrase`, `smart`…), а не порядковыми
   номерами — безопасно при изменении enum.
-- **Миграции**: схемы экспортируются в `app/schemas/`. При изменении сущностей версия БД
+- **Миграции**: `MIGRATION_1_2` добавляет `playlists.cover_path`. `MigrationTest` создаёт базу
+  v1 строго по `app/schemas/…/1.json`, наполняет данными и открывает текущим Room — Room сверяет
+  итоговую схему с ожидаемой. Схемы экспортируются в `app/schemas/`. При изменении сущностей версия БД
   увеличивается и добавляется миграция; `fallbackToDestructiveMigration` не используется.
 - **Лимит параметров SQLite** (999 на старых Android) — массовые операции разбиты на порции.
 
@@ -124,6 +126,15 @@ PlaybackSettings (DataStore) ────────────┼─▶ Queue
   экранами. На этапе 4 он будет обёрнут в `MediaSessionService` + `SimpleBasePlayer`.
 - Манифест содержит `<queries>` для `TTS_SERVICE` — без этого на Android 11+ нельзя получить
   список движков.
+
+## Оформление
+
+- `SeedScheme` строит `ColorScheme` (светлую и тёмную) из одного цвета пользователя:
+  `primary` сдвигается к чёрному/белому до контраста ≥ 4,5:1 с фоном, контейнеры — смесь с
+  фоном. Сам цвет «как есть» (`LocalBrandColor`) — фон обложек плейлистов. `ThemeTest`
+  проверяет контраст на 200+ случайных цветах.
+- Обложки: `CoverStore` копирует выбранную картинку в `files/covers/`, уменьшая до 1024 px;
+  при замене/удалении обложки или плейлиста файл удаляется. (Бэкап этапа 5 будет включать обложки.)
 
 ## Поток данных
 

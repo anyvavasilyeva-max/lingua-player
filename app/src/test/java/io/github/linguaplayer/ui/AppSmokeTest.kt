@@ -69,6 +69,8 @@ class AppSmokeTest {
         click("Новый тег")
         rule.onAllNodesWithText("Название")[0].performTextInput("TOPIK 2급")
         click("Создать")
+        // Ждём закрытия диалога: иначе «TOPIK 2급» находится в его поле ввода.
+        realWait { rule.onAllNodes(isDialog()).fetchSemanticsNodes().isEmpty() }
         waitText("TOPIK 2급")
         rule.onNodeWithText("Кухня").performScrollTo().performClick()
         shot("02_entry_editor")

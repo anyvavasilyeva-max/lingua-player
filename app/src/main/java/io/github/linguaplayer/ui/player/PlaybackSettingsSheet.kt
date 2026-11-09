@@ -29,11 +29,11 @@ import io.github.linguaplayer.data.db.TypeFilter
 import io.github.linguaplayer.player.Direction
 import io.github.linguaplayer.player.PlayOrder
 import io.github.linguaplayer.player.PlaybackSettings
+import io.github.linguaplayer.player.RepeatMode
 
-fun rateLabel(rate: Float): String = when (rate) {
-    0.75f -> "0,75×"
-    1.25f -> "1,25×"
-    else -> "1×"
+fun rateLabel(rate: Float): String {
+    val text = if (rate == rate.toInt().toFloat()) rate.toInt().toString() else rate.toString().replace('.', ',')
+    return "$text×"
 }
 
 /** Панель всех параметров воспроизведения. [sourceName]/[targetName] — названия языков. */
@@ -78,6 +78,15 @@ fun PlaybackSettingsSheet(
                 Chip(settings.order == PlayOrder.SHUFFLE, stringResource(R.string.ps_order_shuffle)) { onChange { it.copy(order = PlayOrder.SHUFFLE) } }
             }
 
+            Section(stringResource(R.string.ps_repeat_mode))
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(
+                    RepeatMode.OFF to R.string.ps_repeat_off,
+                    RepeatMode.ALL to R.string.player_repeat_all,
+                    RepeatMode.ONE to R.string.player_repeat_one,
+                ).forEach { (m, label) -> Chip(settings.repeatMode == m, stringResource(label)) { onChange { it.copy(repeatMode = m) } } }
+            }
+
             Section(stringResource(R.string.ps_pause))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 PlaybackSettings.PAUSES.forEach { p ->
@@ -92,6 +101,12 @@ fun PlaybackSettingsSheet(
                 }
             }
 
+            SwitchRow(
+                stringResource(R.string.ps_slow_repeat),
+                stringResource(R.string.ps_slow_repeat_desc),
+                settings.slowRepeat,
+            ) { v -> onChange { it.copy(slowRepeat = v) } }
+
             Section(stringResource(R.string.ps_rate_source, sourceName))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 PlaybackSettings.RATES.forEach { r ->
@@ -105,19 +120,31 @@ fun PlaybackSettingsSheet(
                 }
             }
 
-            Row(
-                Modifier.fillMaxWidth()
-                    .toggleable(settings.translationEnabled, role = Role.Switch) { v -> onChange { it.copy(translationEnabled = v) } }
-                    .padding(vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text(stringResource(R.string.ps_translation), style = MaterialTheme.typography.titleSmall)
-                    Text(stringResource(R.string.ps_translation_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Switch(checked = settings.translationEnabled, onCheckedChange = null)
-            }
+            SwitchRow(
+                stringResource(R.string.ps_translation),
+                stringResource(R.string.ps_translation_desc),
+                settings.translationEnabled,
+            ) { v -> onChange { it.copy(translationEnabled = v) } }
+            SwitchRow(
+                stringResource(R.string.ps_hide_answer),
+                stringResource(R.string.ps_hide_answer_desc),
+                settings.hideAnswer,
+            ) { v -> onChange { it.copy(hideAnswer = v) } }
         }
+    }
+}
+
+@Composable
+private fun SwitchRow(title: String, description: String, checked: Boolean, onToggle: (Boolean) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().toggleable(checked, role = Role.Switch, onValueChange = onToggle).padding(vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f).padding(end = 12.dp)) {
+            Text(title, style = MaterialTheme.typography.titleSmall)
+            Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Switch(checked = checked, onCheckedChange = null)
     }
 }
 

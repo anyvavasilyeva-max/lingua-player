@@ -22,6 +22,22 @@ import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.SkipNext
 import androidx.compose.material.icons.outlined.SkipPrevious
 import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material.icons.outlined.Repeat
+import androidx.compose.material.icons.outlined.RepeatOn
+import androidx.compose.material.icons.outlined.RepeatOneOn
+import androidx.compose.material.icons.outlined.Shuffle
+import androidx.compose.material.icons.outlined.ShuffleOn
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.VisibilityOff
+import androidx.compose.material3.IconToggleButton
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import io.github.linguaplayer.player.PlayOrder
+import io.github.linguaplayer.player.QueueItem
+import io.github.linguaplayer.player.RepeatMode
 import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
@@ -121,27 +137,25 @@ fun PlayerScreen(onBack: () -> Unit, onOpenVoices: () -> Unit) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(12.dp))
-                Card(
-                    shape = RoundedCornerShape(28.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Column(
-                        Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 32.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        item?.let {
-                            SpokenText(sourceName, it.source, st.speaking == Part.SOURCE, big = true)
-                            Spacer(Modifier.height(16.dp))
-                            SpokenText(
-                                targetName + if (!st.settings.translationEnabled) " · " + stringResource(R.string.player_no_translation) else "",
-                                it.translation,
-                                st.speaking == Part.TRANSLATION,
-                                big = false,
-                            )
-                        }
-                    }
+                item?.let {
+                    FlashCard(
+                        item = it,
+                        speaking = st.speaking,
+                        hideAnswer = st.settings.hideAnswer,
+                        sourceName = sourceName,
+                        targetName = targetName + if (!st.settings.translationEnabled) " · " + stringResource(R.string.player_no_translation) else "",
+                        onNext = { if (vm.hasNext(st)) vm.next() },
+                        onPrevious = { if (vm.hasPrevious(st)) vm.previous() },
+                    )
+                }
+                if (!st.isPlaying) {
+                    Text(
+                        stringResource(R.string.player_swipe_hint),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
                 }
                 Spacer(Modifier.height(12.dp))
                 SettingsSummary(st.settings, item?.sourceFirst ?: true, sourceName, targetName) { showSettings = true }
@@ -152,19 +166,45 @@ fun PlayerScreen(onBack: () -> Unit, onOpenVoices: () -> Unit) {
                 }
 
                 Spacer(Modifier.height(20.dp))
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-                    IconButton(onClick = vm::previous, enabled = st.index > 0, modifier = Modifier.size(56.dp)) {
-                        Icon(Icons.Outlined.SkipPrevious, stringResource(R.string.player_previous), Modifier.size(36.dp))
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    val shuffle = st.settings.order == PlayOrder.SHUFFLE
+                    IconToggleButton(checked = shuffle, onCheckedChange = { vm.toggleShuffle() }) {
+                        Icon(
+                            if (shuffle) Icons.Outlined.ShuffleOn else Icons.Outlined.Shuffle,
+                            stringResource(R.string.player_shuffle),
+                            tint = if (shuffle) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
-                    FilledIconButton(onClick = vm::togglePlay, modifier = Modifier.size(80.dp)) {
+                    IconButton(onClick = vm::previous, enabled = vm.hasPrevious(st), modifier = Modifier.size(52.dp)) {
+                        Icon(Icons.Outlined.SkipPrevious, stringResource(R.string.player_previous), Modifier.size(34.dp))
+                    }
+                    FilledIconButton(onClick = vm::togglePlay, modifier = Modifier.size(72.dp)) {
                         Icon(
                             if (st.isPlaying) Icons.Outlined.Pause else Icons.Outlined.PlayArrow,
                             stringResource(if (st.isPlaying) R.string.player_pause else R.string.player_play),
-                            Modifier.size(44.dp),
+                            Modifier.size(40.dp),
                         )
                     }
-                    IconButton(onClick = vm::next, enabled = st.index < st.queue.lastIndex, modifier = Modifier.size(56.dp)) {
-                        Icon(Icons.Outlined.SkipNext, stringResource(R.string.player_next), Modifier.size(36.dp))
+                    IconButton(onClick = vm::next, enabled = vm.hasNext(st), modifier = Modifier.size(52.dp)) {
+                        Icon(Icons.Outlined.SkipNext, stringResource(R.string.player_next), Modifier.size(34.dp))
+                    }
+                    val mode = st.settings.repeatMode
+                    IconButton(onClick = vm::cycleRepeat) {
+                        Icon(
+                            when (mode) {
+                                RepeatMode.OFF -> Icons.Outlined.Repeat
+                                RepeatMode.ALL -> Icons.Outlined.RepeatOn
+                                RepeatMode.ONE -> Icons.Outlined.RepeatOneOn
+                            },
+                            stringResource(
+                                when (mode) {
+                                    RepeatMode.OFF -> R.string.player_repeat_off
+                                    RepeatMode.ALL -> R.string.player_repeat_all
+                                    RepeatMode.ONE -> R.string.player_repeat_one
+                                },
+                            ),
+                            tint = if (mode == RepeatMode.OFF) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary,
+                        )
                     }
                 }
                 Spacer(Modifier.height(20.dp))
@@ -195,6 +235,75 @@ fun PlayerScreen(onBack: () -> Unit, onOpenVoices: () -> Unit) {
             onChange = vm::updateSettings,
             onDismiss = { showSettings = false },
         )
+    }
+}
+
+/**
+ * Карточка записи. Свайп влево/вправо — следующая/предыдущая (без прослушивания, если плеер на паузе).
+ * Если включено «Скрывать ответ», вторая часть (перевод, а при обратном направлении — слово)
+ * скрыта до нажатия на 👁 или на карточку; на новой карточке снова скрыта.
+ */
+@Composable
+private fun FlashCard(
+    item: QueueItem,
+    speaking: Part?,
+    hideAnswer: Boolean,
+    sourceName: String,
+    targetName: String,
+    onNext: () -> Unit,
+    onPrevious: () -> Unit,
+) {
+    var revealed by remember(item.entryId, item.sourceFirst, hideAnswer) { mutableStateOf(false) }
+    val answerHidden = hideAnswer && !revealed
+    val swipeThreshold = with(LocalDensity.current) { 80.dp.toPx() }
+    Card(
+        shape = RoundedCornerShape(28.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+        modifier = Modifier.fillMaxWidth()
+            .pointerInput(item.entryId) {
+                var total = 0f
+                detectHorizontalDragGestures(
+                    onDragStart = { total = 0f },
+                    onDragEnd = {
+                        if (total < -swipeThreshold) onNext() else if (total > swipeThreshold) onPrevious()
+                    },
+                ) { _, dx -> total += dx }
+            }
+            .clickable(enabled = hideAnswer) { revealed = !revealed },
+    ) {
+        Box(Modifier.fillMaxWidth()) {
+            Column(
+                Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                // Первым показывается то, что звучит первым.
+                val first = if (item.sourceFirst) Triple(sourceName, item.source, Part.SOURCE) else Triple(targetName, item.translation, Part.TRANSLATION)
+                val second = if (item.sourceFirst) Triple(targetName, item.translation, Part.TRANSLATION) else Triple(sourceName, item.source, Part.SOURCE)
+                SpokenText(first.first, first.second, speaking == first.third, big = first.third == Part.SOURCE)
+                Spacer(Modifier.height(16.dp))
+                if (answerHidden) {
+                    Text(second.first, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("• • •", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        stringResource(R.string.player_hidden_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                    )
+                } else {
+                    SpokenText(second.first, second.second, speaking == second.third, big = second.third == Part.SOURCE)
+                }
+            }
+            if (hideAnswer) {
+                IconButton(onClick = { revealed = !revealed }, modifier = Modifier.align(Alignment.TopEnd).padding(4.dp)) {
+                    Icon(
+                        if (revealed) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+                        stringResource(if (revealed) R.string.player_hide_answer else R.string.player_show_answer),
+                    )
+                }
+            }
+        }
     }
 }
 

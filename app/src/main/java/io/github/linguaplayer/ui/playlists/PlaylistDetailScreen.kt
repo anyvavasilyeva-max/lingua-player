@@ -10,6 +10,15 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.Image
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalContext
+import io.github.linguaplayer.ui.components.PlaylistCover
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material.icons.outlined.Tune
@@ -75,6 +84,16 @@ class PlaylistDetailViewModel(private val c: AppContainer, private val id: Long)
         onStarted()
     }
 
+    val coverError = kotlinx.coroutines.flow.MutableStateFlow(false)
+
+    fun setCover(context: android.content.Context, uri: android.net.Uri) = viewModelScope.launch {
+        runCatching { c.covers.import(context.applicationContext, id, uri) }
+            .onSuccess { c.playlists.setCover(id, it); coverError.value = false }
+            .onFailure { coverError.value = true }
+    }
+
+    fun removeCover() = viewModelScope.launch { c.playlists.setCover(id, null) }
+
     fun move(from: Int, to: Int) = viewModelScope.launch { c.playlists.move(id, from, to) }
     fun remove(entryId: Long) = viewModelScope.launch { c.playlists.removeEntries(id, listOf(entryId)) }
 }
@@ -89,6 +108,12 @@ fun PlaylistDetailScreen(playlistId: Long, onBack: () -> Unit, onOpenEntry: (Lon
     val pairs by vm.pairs.collectAsStateWithLifecycle()
     val tags by vm.tags.collectAsStateWithLifecycle()
     var editRules by remember { mutableStateOf<SmartRules?>(null) }
+    var menuOpen by remember { mutableStateOf(false) }
+    val coverError by vm.coverError.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val pickCover = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) vm.setCover(context, uri)
+    }
     val scope = rememberCoroutineScope()
     val normal = playlist?.kind == PlaylistKind.NORMAL
 
@@ -117,6 +142,25 @@ fun PlaylistDetailScreen(playlistId: Long, onBack: () -> Unit, onOpenEntry: (Lon
                             scope.launch { editRules = SmartRules(p.pairId, p.smartType, vm.smartTagIds(), p.smartTagMode) }
                         }) { Icon(Icons.Outlined.Tune, stringResource(R.string.smart_edit)) }
                     }
+                    Box {
+                        IconButton(onClick = { menuOpen = true }) { Icon(Icons.Outlined.MoreVert, stringResource(R.string.action_more)) }
+                        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.cover_change)) },
+                                leadingIcon = { Icon(Icons.Outlined.Image, null) },
+                                onClick = {
+                                    menuOpen = false
+                                    pickCover.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                                },
+                            )
+                            if (p?.coverPath != null) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.cover_remove)) },
+                                    onClick = { menuOpen = false; vm.removeCover() },
+                                )
+                            }
+                        }
+                    }
                 },
             )
         },
@@ -138,6 +182,14 @@ fun PlaylistDetailScreen(playlistId: Long, onBack: () -> Unit, onOpenEntry: (Lon
                 Modifier.padding(padding),
             )
             else -> LazyColumn(Modifier.padding(padding).fillMaxSize(), contentPadding = PaddingValues(bottom = 88.dp)) {
+                playlist?.let { pl ->
+                    item(key = "cover") {
+                        Column(Modifier.fillMaxWidth().padding(vertical = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            PlaylistCover(pl, Modifier.size(180.dp), corner = 16.dp, fontSize = 24)
+                            if (coverError) Text(stringResource(R.string.cover_failed), color = MaterialTheme.colorScheme.error)
+                        }
+                    }
+                }
                 itemsIndexed(list, key = { _, it -> it.entry.id }) { index, item ->
                     EntryRow(
                         item,

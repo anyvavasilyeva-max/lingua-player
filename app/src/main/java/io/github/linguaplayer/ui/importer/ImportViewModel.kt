@@ -36,7 +36,8 @@ data class ImportUiState(
     val pairId: Long? = null,
     val hasHeader: Boolean = true,
     val mapping: ColumnMapping = ColumnMapping(0, 1),
-    val defaultType: EntryType? = null,
+    /** По умолчанию — «слово»; пользователь видит выбор и может сменить на «фраза». */
+    val defaultType: EntryType? = EntryType.WORD,
     val policy: DuplicatePolicy = DuplicatePolicy.SKIP,
     val plan: ImportPlan? = null,
     val progressDone: Int = 0,
@@ -89,7 +90,7 @@ class ImportViewModel(private val c: AppContainer) : ViewModel() {
     private fun ImportUiState.withGuessedMapping(): ImportUiState {
         val header = table?.rows?.firstOrNull().orEmpty()
         val m = if (hasHeader) ColumnGuesser.guess(header) else ColumnMapping(0, 1)
-        return copy(mapping = m, defaultType = if (m.type == null) null else defaultType)
+        return copy(mapping = m, defaultType = defaultType ?: EntryType.WORD)
     }
 
     fun selectSheet(i: Int) = state.update { it.copy(sheetIndex = i).withGuessedMapping() }

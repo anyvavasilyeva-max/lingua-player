@@ -23,7 +23,16 @@ class PlayerViewModel(private val c: AppContainer) : ViewModel() {
         .flatMapLatest { id -> if (id == null) flowOf(false) else c.entries.observeDontRemember(id) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
+    fun hasNext(st: io.github.linguaplayer.player.PlayerState) = player.hasNext(st)
+    fun hasPrevious(st: io.github.linguaplayer.player.PlayerState) = player.hasPrevious(st)
+
     fun togglePlay() = player.togglePlay()
+
+    fun toggleShuffle() = updateSettings {
+        it.copy(order = if (it.order == io.github.linguaplayer.player.PlayOrder.SHUFFLE) io.github.linguaplayer.player.PlayOrder.SEQUENTIAL else io.github.linguaplayer.player.PlayOrder.SHUFFLE)
+    }
+
+    fun cycleRepeat() = updateSettings { it.copy(repeatMode = it.repeatMode.next()) }
     fun next() = player.next()
     fun previous() = player.previous()
 

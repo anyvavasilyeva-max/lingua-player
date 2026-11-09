@@ -229,4 +229,22 @@ class RepositoryTest {
             assertEquals(UserFacingException.Reason.PAIR_IN_USE, e.reason)
         }
     }
+
+    @Test
+    fun coverFilesAreDeletedWhenReplacedOrPlaylistDeleted() = runTest {
+        val deleted = mutableListOf<String>()
+        val repo = io.github.linguaplayer.data.repo.PlaylistRepository(t.db, t.entries, t.clock) { deleted += it }
+        val id = repo.create("Обложка")
+        repo.setCover(id, "/covers/a.jpg")
+        assertEquals("/covers/a.jpg", repo.get(id)!!.coverPath)
+        repo.setCover(id, "/covers/b.jpg")
+        assertEquals(listOf("/covers/a.jpg"), deleted)
+        repo.delete(id)
+        assertEquals(listOf("/covers/a.jpg", "/covers/b.jpg"), deleted)
+        val id2 = repo.create("Без обложки")
+        repo.setCover(id2, "/covers/c.jpg")
+        repo.setCover(id2, null)
+        assertEquals("/covers/c.jpg", deleted.last())
+        org.junit.Assert.assertNull(repo.get(id2)!!.coverPath)
+    }
 }

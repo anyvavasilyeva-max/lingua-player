@@ -7,6 +7,23 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.automirrored.outlined.ViewList
+import androidx.compose.material.icons.outlined.GridView
+import androidx.compose.material3.IconToggleButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.res.pluralStringResource
+import io.github.linguaplayer.data.db.PlaylistWithCount
+import io.github.linguaplayer.ui.components.PlaylistCover
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.MoreVert
@@ -58,6 +75,9 @@ class PlaylistsViewModel(private val c: AppContainer) : ViewModel() {
     }
     fun rename(id: Long, name: String) = viewModelScope.launch { runCatching { c.playlists.rename(id, name) } }
     fun delete(id: Long) = viewModelScope.launch { c.playlists.delete(id) }
+
+    val grid = c.settings.playlistsGrid.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+    fun setGrid(v: Boolean) = viewModelScope.launch { c.settings.setPlaylistsGrid(v) }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -71,9 +91,23 @@ fun PlaylistsScreen(onOpenPlaylist: (Long) -> Unit) {
     var showCreate by remember { mutableStateOf(false) }
     var renaming by remember { mutableStateOf<PlaylistEntity?>(null) }
     var deleting by remember { mutableStateOf<PlaylistEntity?>(null) }
+    val grid by vm.grid.collectAsStateWithLifecycle()
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text(stringResource(R.string.nav_playlists)) }) },
+        topBar = {
+            TopAppBar(
+                title = { Text(stringResource(R.string.nav_playlists)) },
+                actions = {
+                    IconButton(onClick = { showCreate = true }) { Icon(Icons.Outlined.Add, stringResource(R.string.playlist_new)) }
+                    IconToggleButton(checked = !grid, onCheckedChange = { vm.setGrid(false) }) {
+                        Icon(Icons.AutoMirrored.Outlined.ViewList, stringResource(R.string.playlists_view_list))
+                    }
+                    IconToggleButton(checked = grid, onCheckedChange = { vm.setGrid(true) }) {
+                        Icon(Icons.Outlined.GridView, stringResource(R.string.playlists_view_grid))
+                    }
+                },
+            )
+        },
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = { showCreate = true },
@@ -86,6 +120,21 @@ fun PlaylistsScreen(onOpenPlaylist: (Long) -> Unit) {
         when {
             list == null -> Unit
             list.isEmpty() -> EmptyState(stringResource(R.string.playlists_empty), Modifier.padding(padding))
+            grid -> LazyVerticalGrid(
+                columns = GridCells.Adaptive(120.dp),
+                modifier = Modifier.padding(padding).fillMaxSize(),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 88.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                items(list, key = { it.playlist.id }) { p ->
+                    PlaylistTile(
+                        p,
+                        onClick = { onOpenPlaylist(p.playlist.id) },
+                        menu = { PlaylistMenu(onRename = { renaming = p.playlist }, onDelete = { deleting = p.playlist }) },
+                    )
+                }
+            }
             else -> LazyColumn(Modifier.padding(padding).fillMaxSize(), contentPadding = PaddingValues(bottom = 88.dp)) {
                 items(list, key = { it.playlist.id }) { p ->
                     PlaylistListItem(
@@ -129,6 +178,30 @@ fun PlaylistsScreen(onOpenPlaylist: (Long) -> Unit) {
             text = stringResource(R.string.playlist_delete_confirm, p.name),
             onDismiss = { deleting = null },
             onConfirm = { vm.delete(p.id); deleting = null },
+        )
+    }
+}
+
+/** Плитка плейлиста: обложка + число записей, меню в углу. */
+@Composable
+fun PlaylistTile(p: PlaylistWithCount, onClick: () -> Unit, modifier: Modifier = Modifier, menu: (@Composable () -> Unit)? = null) {
+    Column(modifier.clickable(onClick = onClick)) {
+        Box {
+            PlaylistCover(p.playlist, Modifier.fillMaxWidth().aspectRatio(1f))
+            if (menu != null) {
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
+                    modifier = Modifier.align(Alignment.TopEnd).padding(4.dp),
+                ) { menu() }
+            }
+        }
+        Text(
+            if (p.playlist.kind == PlaylistKind.SMART) stringResource(R.string.playlist_smart)
+            else pluralStringResource(R.plurals.entries_count, p.entryCount, p.entryCount),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 4.dp, start = 2.dp),
         )
     }
 }

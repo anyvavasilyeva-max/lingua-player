@@ -47,7 +47,7 @@ fun MiniPlayer(player: PlayerEngine, onOpen: () -> Unit) {
                     stringResource(if (st.isPlaying) R.string.player_pause else R.string.player_play),
                 )
             }
-            IconButton(onClick = player::next, enabled = st.index < st.queue.lastIndex) {
+            IconButton(onClick = player::next, enabled = player.hasNext(st)) {
                 Icon(Icons.Outlined.SkipNext, stringResource(R.string.player_next))
             }
         }

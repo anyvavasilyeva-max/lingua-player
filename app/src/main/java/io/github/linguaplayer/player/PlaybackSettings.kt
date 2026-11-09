@@ -24,6 +24,22 @@ enum class PlayOrder(val code: String) {
     }
 }
 
+/** Повтор, как в музыкальном плеере. */
+enum class RepeatMode(val code: String) {
+    /** Доиграть очередь и остановиться. */
+    OFF("off"),
+    /** Зациклить список: после последней записи — снова первая. */
+    ALL("all"),
+    /** Зациклить запись: текущая запись повторяется, пока не нажать ⏭. */
+    ONE("one");
+
+    fun next(): RepeatMode = when (this) { OFF -> ALL; ALL -> ONE; ONE -> OFF }
+
+    companion object {
+        fun fromCode(c: String?) = entries.firstOrNull { it.code == c } ?: OFF
+    }
+}
+
 /** Все параметры воспроизведения. Хранятся в DataStore (SettingsRepository). */
 data class PlaybackSettings(
     val direction: Direction = Direction.SOURCE_TO_TARGET,
@@ -39,6 +55,11 @@ data class PlaybackSettings(
     val targetRate: Float = 1f,
     /** false — режим без перевода: звучит только изучаемый язык. */
     val translationEnabled: Boolean = true,
+    val repeatMode: RepeatMode = RepeatMode.OFF,
+    /** Повторы с замедлением: 2-й (и каждый чётный) повтор — на одну ступень скорости медленнее. */
+    val slowRepeat: Boolean = false,
+    /** Скрывать ответ на карточке плеера, пока не нажать «глазик». */
+    val hideAnswer: Boolean = false,
 ) {
     /** Параметры, при изменении которых нужно перестроить очередь. */
     fun queueKey() = Triple(direction, typeFilter, order)
@@ -46,6 +67,9 @@ data class PlaybackSettings(
     companion object {
         val PAUSES = listOf(0, 2, 5, 10)
         val REPEATS = listOf(1, 2, 3)
-        val RATES = listOf(0.75f, 1f, 1.25f)
+        val RATES = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f)
+
+        /** Скорость на одну ступень медленнее (минимум — самая медленная ступень). */
+        fun slower(rate: Float): Float = RATES.lastOrNull { it < rate - 0.001f } ?: RATES.first()
     }
 }

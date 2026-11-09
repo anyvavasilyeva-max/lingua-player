@@ -30,6 +30,8 @@ class PlaylistRepository(
     private val db: AppDatabase,
     private val entries: EntryRepository,
     private val clock: () -> Long = System::currentTimeMillis,
+    /** Удаление файла обложки (в тестах — подмена). */
+    private val deleteFile: (String) -> Unit = { java.io.File(it).delete() },
 ) {
     private val dao = db.playlistDao()
 
@@ -86,8 +88,19 @@ class PlaylistRepository(
         }
     }
 
-    /** Удаляет плейлист. Словарные записи остаются в библиотеке. */
-    suspend fun delete(id: Long) = dao.delete(id)
+    /** Удаляет плейлист (и файл обложки). Словарные записи остаются в библиотеке. */
+    suspend fun delete(id: Long) {
+        val cover = dao.getById(id)?.coverPath
+        dao.delete(id)
+        cover?.let(deleteFile)
+    }
+
+    /** Ставит (или убирает, если null) обложку. Старый файл удаляется. */
+    suspend fun setCover(id: Long, path: String?) {
+        val old = dao.getById(id)?.coverPath
+        dao.setCover(id, path, clock())
+        if (old != null && old != path) deleteFile(old)
+    }
 
     suspend fun markOpened(id: Long) = dao.markOpened(id, clock())
 

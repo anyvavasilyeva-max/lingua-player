@@ -116,6 +116,8 @@ data class PlaylistEntity(
     @ColumnInfo(name = "created_at") val createdAt: Long,
     @ColumnInfo(name = "updated_at") val updatedAt: Long,
     @ColumnInfo(name = "last_opened_at") val lastOpenedAt: Long? = null,
+    /** Путь к файлу обложки во внутренней памяти приложения; null — обложка из названия. Схема v2. */
+    @ColumnInfo(name = "cover_path") val coverPath: String? = null,
 )
 
 /**

@@ -12,6 +12,16 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Palette
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import io.github.linguaplayer.data.repo.DEFAULT_SEED_COLOR
+import io.github.linguaplayer.ui.components.ColorPickerDialog
 import androidx.compose.material.icons.outlined.RecordVoiceOver
 import androidx.compose.material.icons.automirrored.outlined.Label
 import androidx.compose.material3.AlertDialog
@@ -72,6 +82,9 @@ class SettingsViewModel(private val c: AppContainer) : ViewModel() {
     }
 
     fun clearError() { error.value = null }
+
+    val seedColor = c.settings.seedColor.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DEFAULT_SEED_COLOR)
+    fun setSeedColor(argb: Int) = viewModelScope.launch { c.settings.setSeedColor(argb) }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -83,6 +96,8 @@ fun SettingsScreen(onManageTags: () -> Unit, onOpenVoices: () -> Unit) {
     val active by vm.active.collectAsStateWithLifecycle()
     val error by vm.error.collectAsStateWithLifecycle()
     var showAdd by remember { mutableStateOf(false) }
+    var showColor by remember { mutableStateOf(false) }
+    val seed by vm.seedColor.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     val errMsg = error?.let { errorText(it) }
     val context = LocalContext.current
@@ -124,6 +139,16 @@ fun SettingsScreen(onManageTags: () -> Unit, onOpenVoices: () -> Unit) {
                 )
                 HorizontalDivider()
                 ListItem(
+                    modifier = Modifier.clickable { showColor = true },
+                    leadingContent = { Icon(Icons.Outlined.Palette, null) },
+                    headlineContent = { Text(stringResource(R.string.theme_title)) },
+                    supportingContent = { Text(stringResource(R.string.theme_desc)) },
+                    trailingContent = {
+                        Box(Modifier.size(32.dp).clip(CircleShape).background(Color(seed)).border(1.dp, MaterialTheme.colorScheme.outline, CircleShape))
+                    },
+                )
+                HorizontalDivider()
+                ListItem(
                     modifier = Modifier.clickable(onClick = onOpenVoices),
                     leadingContent = { Icon(Icons.Outlined.RecordVoiceOver, null) },
                     headlineContent = { Text(stringResource(R.string.settings_voices)) },
@@ -146,6 +171,14 @@ fun SettingsScreen(onManageTags: () -> Unit, onOpenVoices: () -> Unit) {
         }
     }
 
+    if (showColor) {
+        ColorPickerDialog(
+            initial = seed,
+            defaultColor = DEFAULT_SEED_COLOR,
+            onDismiss = { showColor = false },
+            onConfirm = { vm.setSeedColor(it); showColor = false },
+        )
+    }
     if (showAdd) {
         AddPairDialog(
             error = errMsg,

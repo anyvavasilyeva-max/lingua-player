@@ -96,15 +96,28 @@ class PlayerEngine(
 
     fun togglePlay() = if (_state.value.isPlaying) pause() else play()
 
+    /** Есть ли следующая запись (при «зациклить список» — всегда). */
+    fun hasNext(st: PlayerState = _state.value) =
+        st.hasQueue && (st.index + 1 < st.queue.size || st.settings.repeatMode == RepeatMode.ALL)
+
+    fun hasPrevious(st: PlayerState = _state.value) =
+        st.hasQueue && (st.index > 0 || st.settings.repeatMode == RepeatMode.ALL)
+
     fun next() {
         val st = _state.value
-        if (st.index + 1 >= st.queue.size) return
-        restart(st.isPlaying) { it.copy(index = it.index + 1, ended = false) }
+        if (!hasNext(st)) return
+        restart(st.isPlaying) { it.copy(index = (it.index + 1) % it.queue.size, ended = false) }
     }
 
     fun previous() {
         val st = _state.value
-        restart(st.isPlaying) { it.copy(index = (it.index - 1).coerceAtLeast(0), ended = false) }
+        if (!st.hasQueue) return
+        val target = when {
+            st.index > 0 -> st.index - 1
+            st.settings.repeatMode == RepeatMode.ALL -> st.queue.lastIndex
+            else -> 0
+        }
+        restart(st.isPlaying) { it.copy(index = target, ended = false) }
     }
 
     fun seekTo(index: Int) {
@@ -160,8 +173,7 @@ class PlayerEngine(
                     is Step.Speak -> {
                         _state.update { it.copy(speaking = step.part) }
                         // Скорость берётся из актуальных настроек — её можно менять на ходу.
-                        val s = _state.value.settings
-                        val rate = if (step.part == Part.SOURCE) s.sourceRate else s.targetRate
+                        val rate = SpeechPlanner.rate(step, _state.value.settings)
                         when (val r = speech.speak(step.text, step.lang, rate)) {
                             SpeakResult.Done -> consecutiveFailures = 0
                             is SpeakResult.LanguageUnavailable -> {
@@ -179,11 +191,14 @@ class PlayerEngine(
                 }
             }
             val now = _state.value
-            if (now.index + 1 < now.queue.size) {
-                _state.update { it.copy(index = it.index + 1, speaking = null) }
-            } else {
-                _state.update { it.copy(isPlaying = false, speaking = null, ended = true) }
-                break
+            when {
+                now.settings.repeatMode == RepeatMode.ONE -> _state.update { it.copy(speaking = null) }
+                now.index + 1 < now.queue.size -> _state.update { it.copy(index = it.index + 1, speaking = null) }
+                now.settings.repeatMode == RepeatMode.ALL -> _state.update { it.copy(index = 0, speaking = null) }
+                else -> {
+                    _state.update { it.copy(isPlaying = false, speaking = null, ended = true) }
+                    break
+                }
             }
         }
     }

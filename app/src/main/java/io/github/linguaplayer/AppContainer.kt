@@ -4,6 +4,7 @@ import android.content.Context
 import io.github.linguaplayer.data.db.AppDatabase
 import io.github.linguaplayer.data.db.LanguagePairEntity
 import io.github.linguaplayer.data.repo.EntryRepository
+import io.github.linguaplayer.data.repo.CoverStore
 import io.github.linguaplayer.data.repo.ImportRepository
 import io.github.linguaplayer.data.repo.LanguagePairRepository
 import io.github.linguaplayer.data.repo.PlaylistRepository
@@ -33,6 +34,7 @@ class AppContainer(private val context: Context) {
     val tags = TagRepository(database)
     val playlists = PlaylistRepository(database, entries)
     val languagePairs = LanguagePairRepository(database)
+    val covers = CoverStore(context)
     val importer = ImportRepository(database, tags)
 
     /** Область для долгих операций (импорт), которые не должны прерываться при уходе с экрана. */

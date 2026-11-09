@@ -208,4 +208,53 @@ class PlayerEngineTest {
         assertEquals(0, p.state.value.index)
         assertEquals("포크", fake.texts.last())
     }
+
+    @Test
+    fun repeatAllLoopsList() = runTest {
+        val fake = FakeSpeech(this)
+        val p = engine(fake, PlaybackSettings(pauseSeconds = 0, repeatMode = RepeatMode.ALL))
+        p.load(source(SAMPLE.take(2)))
+        // одна запись = 1 + 1 + 1,2 = 3,2 с; за 10 с — 3 записи
+        advanceTimeBy(10_000); runCurrent()
+        assertEquals(listOf("포크", "Вилка", "숟가락", "Ложка", "포크", "Вилка", "숟가락"), fake.texts)
+        assertTrue(p.state.value.isPlaying)
+        assertFalse(p.state.value.ended)
+    }
+
+    @Test
+    fun repeatOneLoopsCurrentEntryUntilNext() = runTest {
+        val fake = FakeSpeech(this)
+        val p = engine(fake, PlaybackSettings(pauseSeconds = 0, repeatMode = RepeatMode.ONE))
+        p.load(source(SAMPLE.take(3)))
+        advanceTimeBy(7_000); runCurrent()
+        assertEquals(listOf("포크", "Вилка", "포크", "Вилка", "포크"), fake.texts)
+        assertEquals(0, p.state.value.index)
+        p.next()
+        advanceTimeBy(100); runCurrent()
+        assertEquals("숟가락", fake.texts.last())
+    }
+
+    @Test
+    fun repeatAllWrapsNextAndPrevious() = runTest {
+        val fake = FakeSpeech(this)
+        val p = engine(fake, PlaybackSettings(repeatMode = RepeatMode.ALL))
+        p.load(source(), autoplay = false)
+        p.previous()
+        assertEquals(4, p.state.value.index)
+        p.next()
+        assertEquals(0, p.state.value.index)
+        p.updateSettings(p.state.value.settings.copy(repeatMode = RepeatMode.OFF))
+        p.previous()
+        assertEquals(0, p.state.value.index)
+        assertFalse(p.hasPrevious())
+    }
+
+    @Test
+    fun slowRepeatRatesReachEngine() = runTest {
+        val fake = FakeSpeech(this)
+        val p = engine(fake, PlaybackSettings(repeats = 3, slowRepeat = true, sourceRate = 1.25f))
+        p.load(source(SAMPLE.take(1)))
+        finish()
+        assertEquals(listOf(1.25f, 1f, 1.25f, 1f), fake.log.map { it.rate }) // 3 повтора + перевод 1×
+    }
 }

@@ -272,4 +272,32 @@
     <string name="sample_save">Сохранить пример CSV</string>
     <string name="sample_saved">Пример сохранён. Откройте его в Excel или Google Таблицах, замените строки своими словами и импортируйте.</string>
     <string name="sample_save_failed">Не удалось сохранить файл</string>
+
+    <!-- Плеер: карточки и повторы -->
+    <string name="player_show_answer">Показать ответ</string>
+    <string name="player_hide_answer">Скрыть ответ</string>
+    <string name="player_hidden_hint">Нажмите на карточку или 👁, чтобы показать</string>
+    <string name="player_shuffle">Перемешать</string>
+    <string name="player_repeat_off">Повтор выключен</string>
+    <string name="player_repeat_all">Зациклить список</string>
+    <string name="player_repeat_one">Зациклить запись</string>
+    <string name="player_swipe_hint">Листайте карточку влево/вправо — без прослушивания</string>
+    <string name="ps_repeat_mode">Повтор</string>
+    <string name="ps_repeat_off">Не повторять</string>
+    <string name="ps_slow_repeat">Повтор с замедлением</string>
+    <string name="ps_slow_repeat_desc">Второй раз — на одну ступень медленнее. Например, 2 раза: 1× · 0,75×; 3 раза: 1× · 0,75× · 1×</string>
+    <string name="ps_hide_answer">Скрывать ответ на карточке</string>
+    <string name="ps_hide_answer_desc">Перевод (или слово — при обратном направлении) открывается кнопкой 👁. Удобно листать как карточки</string>
+
+    <!-- Оформление -->
+    <string name="theme_title">Цвет оформления</string>
+    <string name="theme_desc">Любой цвет из спектра; из него строится светлая и тёмная тема</string>
+    <string name="theme_reset">По умолчанию %1$s</string>
+
+    <!-- Обложки -->
+    <string name="playlists_view_list">Списком</string>
+    <string name="playlists_view_grid">Плиткой</string>
+    <string name="cover_change">Выбрать обложку</string>
+    <string name="cover_remove">Убрать обложку</string>
+    <string name="cover_failed">Не удалось открыть изображение</string>
 </resources>

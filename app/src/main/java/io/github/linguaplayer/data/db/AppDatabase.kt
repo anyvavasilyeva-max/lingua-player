@@ -5,6 +5,7 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
+import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import io.github.linguaplayer.R
 import io.github.linguaplayer.util.TextKeys
@@ -26,7 +27,7 @@ import io.github.linguaplayer.util.TextKeys
         PlaylistEntryCrossRef::class,
         SmartPlaylistTagCrossRef::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -39,8 +40,15 @@ abstract class AppDatabase : RoomDatabase() {
     companion object {
         const val FILE_NAME = "lingua_player.db"
 
+        /** v1 → v2: обложки плейлистов. */
+        val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE playlists ADD COLUMN cover_path TEXT")
+            }
+        }
+
         /** Все миграции схемы перечисляются здесь. */
-        val MIGRATIONS = arrayOf<androidx.room.migration.Migration>()
+        val MIGRATIONS = arrayOf<Migration>(MIGRATION_1_2)
 
         fun build(context: Context, inMemory: Boolean = false): AppDatabase {
             val builder = if (inMemory) {

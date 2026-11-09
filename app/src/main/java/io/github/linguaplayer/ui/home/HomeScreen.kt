@@ -13,6 +13,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.layout.width
+import io.github.linguaplayer.ui.playlists.PlaylistTile
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.QueueMusic
@@ -146,8 +149,14 @@ fun HomeScreen(
                 )
             }
         }
-        items(state.recent, key = { it.playlist.id }) { p ->
-            PlaylistListItem(p, Modifier.clickable { onOpenPlaylist(p.playlist.id) })
+        if (state.recent.isNotEmpty()) {
+            item {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    items(state.recent, key = { it.playlist.id }) { p ->
+                        PlaylistTile(p, onClick = { onOpenPlaylist(p.playlist.id) }, modifier = Modifier.width(132.dp))
+                    }
+                }
+            }
         }
     }
 }

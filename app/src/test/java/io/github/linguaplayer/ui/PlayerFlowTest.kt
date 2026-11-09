@@ -3,6 +3,10 @@ package io.github.linguaplayer.ui
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeLeft
+import androidx.compose.ui.test.swipeRight
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -57,6 +61,9 @@ class PlayerFlowTest {
     fun setUp() {
         c.playerSpeechOverride = speech
         runBlocking {
+            // DataStore — один на процесс тестов: сбрасываем настройки, чтобы тесты не влияли друг на друга.
+            c.settings.updatePlayback { io.github.linguaplayer.player.PlaybackSettings() }
+            c.settings.setSeedColor(io.github.linguaplayer.data.repo.DEFAULT_SEED_COLOR)
             val pair = c.languagePairs.getAll().first().id
             c.entries.save(EntryDraft(pairId = pair, source = "포크", translation = "Вилка", type = EntryType.WORD, tagIds = emptySet()))
             c.entries.save(EntryDraft(pairId = pair, source = "숟가락", translation = "Ложка", type = EntryType.WORD, tagIds = emptySet()))
@@ -112,5 +119,46 @@ class PlayerFlowTest {
         val saved = runBlocking { c.settings.playback.first() }
         assertEquals(io.github.linguaplayer.player.Direction.TARGET_TO_SOURCE, saved.direction)
         assertEquals(io.github.linguaplayer.data.db.TypeFilter.WORDS, saved.typeFilter)
+    }
+
+    @Test
+    fun flashcardsHiddenAnswerEyeSwipeRepeatShuffle() {
+        runBlocking { c.settings.updatePlayback { it.copy(hideAnswer = true) } }
+        ui.waitText("Что послушаем?")
+        ui.clickDesc("Слушать")
+        ui.waitText("1 из 3")
+        // Ставим на паузу и листаем как карточки — без прослушивания.
+        ui.clickDesc("Пауза")
+        ui.realWait { !c.player.state.value.isPlaying }
+        val spokenBefore = speech.spoken.size
+
+        // Ответ (перевод) скрыт, пока не нажать «глазик».
+        ui.waitText("설거지를 하다")
+        ui.waitText("• • •")
+        org.junit.Assert.assertTrue(rule.onAllNodesWithText("Мыть посуду").fetchSemanticsNodes().isEmpty())
+        ui.shot("22_card_hidden")
+        ui.clickDesc("Показать ответ")
+        ui.waitText("Мыть посуду")
+        ui.shot("23_card_revealed")
+
+        // Свайп влево — следующая карточка, ответ снова скрыт.
+        rule.onAllNodesWithText("설거지를 하다", useUnmergedTree = true)[0].performTouchInput { swipeLeft() }
+        ui.waitText("2 из 3")
+        ui.waitText("• • •")
+        rule.onAllNodesWithText("숟가락", useUnmergedTree = true)[0].performTouchInput { swipeRight() }
+        ui.waitText("1 из 3")
+        assertEquals(spokenBefore, speech.spoken.size) // листание на паузе ничего не произносит
+
+        // Кнопки повтора и перемешивания сохраняются в настройках.
+        ui.clickDesc("Повтор выключен")
+        ui.realWait { runBlocking { c.settings.playback.first().repeatMode } == io.github.linguaplayer.player.RepeatMode.ALL }
+        ui.realWait { c.player.state.value.settings.repeatMode == io.github.linguaplayer.player.RepeatMode.ALL }
+        ui.clickDesc("Зациклить список")
+        ui.realWait { runBlocking { c.settings.playback.first().repeatMode } == io.github.linguaplayer.player.RepeatMode.ONE }
+        ui.clickDesc("Перемешать")
+        ui.realWait { runBlocking { c.settings.playback.first().order } == io.github.linguaplayer.player.PlayOrder.SHUFFLE }
+        // При перемешивании текущая карточка осталась текущей.
+        assertEquals("설거지를 하다", c.player.state.value.current!!.source)
+        ui.shot("24_player_controls")
     }
 }

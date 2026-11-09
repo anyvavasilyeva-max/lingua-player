@@ -54,7 +54,9 @@ class UiTestHelper(private val rule: ComposeTestRule) {
     /** Ждёт элемент с описанием (иконка-кнопка) и нажимает его. */
     fun clickDesc(description: String) {
         realWait { rule.onAllNodesWithContentDescription(description).fetchSemanticsNodes().isNotEmpty() }
-        rule.onAllNodesWithContentDescription(description)[0].performClick()
+        val node = rule.onAllNodesWithContentDescription(description)[0]
+        runCatching { node.performScrollTo() } // кнопка может быть ниже видимой части экрана
+        node.performClick()
     }
 
     fun click(text: String) {

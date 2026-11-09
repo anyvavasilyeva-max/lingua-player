@@ -186,6 +186,9 @@ interface PlaylistDao {
     @Query("DELETE FROM playlists WHERE id = :id")
     suspend fun delete(id: Long)
 
+    @Query("UPDATE playlists SET cover_path = :path, updated_at = :time WHERE id = :id")
+    suspend fun setCover(id: Long, path: String?, time: Long)
+
     @Query("UPDATE playlists SET last_opened_at = :time WHERE id = :id")
     suspend fun markOpened(id: Long, time: Long)
 

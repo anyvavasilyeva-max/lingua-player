@@ -27,6 +27,7 @@ fun source(entries: List<EntryEntity> = SAMPLE) = PlaybackSource("Кухня", e
  * Поддельный синтезатор: каждая фраза «звучит» [durationMs] виртуального времени.
  * Записывает начало и конец каждой фразы — по ним тесты проверяют отсутствие наложений.
  */
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class FakeSpeech(private val scope: TestScope, private val durationMs: Long = 1000) : SpeechEngine {
     data class Utterance(val text: String, val lang: String, val rate: Float, val start: Long, var end: Long? = null)
 
