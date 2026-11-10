@@ -38,7 +38,8 @@ class AutoBackupTest {
     private val backupRepo = BackupRepository(t.db, settings, File(context.filesDir, "covers"), "test")
     private val localDir = File(context.cacheDir, "autobackup-test-${System.nanoTime()}")
     private val auto = AutoBackup(context, t.db, backupRepo, settings, { time++ }, localDir)
-    private val target = File(context.cacheDir, "drive/lingua_player_autobackup.lpbackup").apply { parentFile?.mkdirs() }
+    // Свой файл у каждого теста: фоновая задача соседнего теста не должна писать в него.
+    private val target = File(context.cacheDir, "drive-${System.nanoTime()}/lingua_player_autobackup.lpbackup").apply { parentFile?.mkdirs() }
 
     @Before
     fun setUp() {
@@ -51,7 +52,14 @@ class AutoBackupTest {
     }
 
     @After
-    fun tearDown() = t.close()
+    fun tearDown() {
+        runCatching { WorkManager.getInstance(context).cancelAllWork().result.get() }
+        // Подписки контейнера живут дольше теста (Robolectric создаёт новое Application на каждый тест,
+        // а старое не уничтожается) — останавливаем их, чтобы они не писали в файлы следующего теста.
+        context.container.appScope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
+        runBlocking { settings.setAutoBackupEnabled(false) }
+        t.close()
+    }
 
     private suspend fun addWord(s: String) {
         t.entries.save(EntryDraft(pairId = t.pairs.getAll().first().id, source = s, translation = "x", type = EntryType.WORD, tagIds = emptySet()))
