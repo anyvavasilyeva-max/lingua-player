@@ -275,12 +275,10 @@
     <!-- Плеер: карточки и повторы -->
     <string name="player_show_answer">Показать ответ</string>
     <string name="player_hide_answer">Скрыть ответ</string>
-    <string name="player_hidden_hint">Нажмите на карточку или 👁. Удерживайте 👁 — для всех карточек</string>
     <string name="player_shuffle">Перемешать</string>
     <string name="player_repeat_off">Повтор выключен</string>
     <string name="player_repeat_all">Зациклить список</string>
     <string name="player_repeat_one">Зациклить запись</string>
-    <string name="player_swipe_hint">Листайте карточку влево/вправо — без прослушивания</string>
     <string name="ps_repeat_mode">Повтор</string>
     <string name="ps_repeat_off">Не повторять</string>
     <string name="ps_slow_repeat">Повтор с замедлением</string>
@@ -304,4 +302,5 @@
     <string name="player_hide_all">Скрыть ответ на всех карточках</string>
     <string name="player_all_hidden">Ответ скрыт на всех карточках</string>
     <string name="player_all_shown">Ответ открыт на всех карточках</string>
+    <string name="player_card_hints">Нажмите на 👁 или на карточку, чтобы показать или скрыть ответ.\nУдерживайте 👁, чтобы скрыть или показать ответ сразу на всех карточках.\nЛистайте карточку влево/вправо — без прослушивания.</string>
 </resources>

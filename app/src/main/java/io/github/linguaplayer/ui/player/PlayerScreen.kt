@@ -163,15 +163,6 @@ fun PlayerScreen(onBack: () -> Unit, onOpenVoices: () -> Unit) {
                         },
                     )
                 }
-                if (!st.isPlaying) {
-                    Text(
-                        stringResource(R.string.player_swipe_hint),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(top = 8.dp),
-                    )
-                }
                 Spacer(Modifier.height(12.dp))
                 SettingsSummary(st.settings, item?.sourceFirst ?: true, sourceName, targetName) { showSettings = true }
 
@@ -237,6 +228,14 @@ fun PlayerScreen(onBack: () -> Unit, onOpenVoices: () -> Unit) {
                         Text(stringResource(R.string.player_dont_remember), Modifier.padding(start = 8.dp))
                     }
                 }
+                // Все подсказки — под «Не помню», чтобы не загромождать карточку.
+                Text(
+                    stringResource(R.string.player_card_hints),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(top = 12.dp),
+                )
                 Spacer(Modifier.height(24.dp))
             }
         }
@@ -302,12 +301,6 @@ private fun FlashCard(
                 if (answerHidden) {
                     Text(second.first, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text("• • •", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(
-                        stringResource(R.string.player_hidden_hint),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                    )
                 } else {
                     SpokenText(second.first, second.second, speaking == second.third, big = second.third == Part.SOURCE)
                 }
@@ -323,7 +316,7 @@ private fun FlashCard(
     }
 }
 
-/** 👁: нажатие — текущая карточка, удержание — все карточки. */
+/** 👁: значок — текущее состояние ответа; нажатие — текущая карточка, удержание — все карточки. */
 @Composable
 private fun EyeButton(hidden: Boolean, onTap: () -> Unit, onHold: () -> Unit, modifier: Modifier = Modifier) {
     val description = stringResource(if (hidden) R.string.player_show_answer else R.string.player_hide_answer)
@@ -341,7 +334,8 @@ private fun EyeButton(hidden: Boolean, onTap: () -> Unit, onHold: () -> Unit, mo
             .semantics { contentDescription = description },
         contentAlignment = Alignment.Center,
     ) {
-        Icon(if (hidden) Icons.Outlined.Visibility else Icons.Outlined.VisibilityOff, null)
+        // Значок показывает текущее состояние: перечёркнутый глаз — ответ скрыт, открытый — виден.
+        Icon(if (hidden) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility, null)
     }
 }
 

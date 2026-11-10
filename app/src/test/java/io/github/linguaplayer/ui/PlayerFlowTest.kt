@@ -3,6 +3,7 @@ package io.github.linguaplayer.ui
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.longClick
@@ -190,6 +191,10 @@ class PlayerFlowTest {
         ui.waitText("3 из 3")
         ui.waitText("• • •")
         ui.shot("25_eye_all_hidden")
+        // Подсказка про удержание — под кнопкой «Не помню».
+        rule.onAllNodesWithText("Удерживайте 👁", substring = true, useUnmergedTree = true)[0].performScrollTo()
+        org.junit.Assert.assertTrue(rule.onAllNodesWithText("чтобы показать", substring = true).fetchSemanticsNodes().size == 1)
+        ui.shot("26_eye_hold_hint")
 
         // Нажатие на скрытой — открыть только её; общий режим остаётся «скрыто».
         ui.clickDesc("Показать ответ")
