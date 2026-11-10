@@ -102,6 +102,21 @@ class PlaylistDetailViewModel(private val c: AppContainer, private val id: Long)
 
     fun removeCover() = viewModelScope.launch { c.playlists.setCover(id, null) }
 
+    /** Экспорт плейлиста (в его порядке) в CSV или XLSX. */
+    val exported = kotlinx.coroutines.flow.MutableStateFlow<Int?>(null)
+
+    fun export(context: android.content.Context, uri: android.net.Uri, xlsx: Boolean) = viewModelScope.launch {
+        val p = c.playlists.get(id) ?: return@launch
+        val rows = c.exporter.rows(c.playlists.filterFor(p))
+        runCatching {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                context.contentResolver.openOutputStream(uri, "wt")!!.use { out ->
+                    if (xlsx) c.exporter.writeXlsx(p.name, rows, out) else c.exporter.writeCsv(rows, out)
+                }
+            }
+        }.onSuccess { exported.value = rows.size - 1 }
+    }
+
     fun move(from: Int, to: Int) = viewModelScope.launch { c.playlists.move(id, from, to) }
     fun remove(entryId: Long) = viewModelScope.launch { c.playlists.removeEntries(id, listOf(entryId)) }
 }
@@ -121,6 +136,20 @@ fun PlaylistDetailScreen(playlistId: Long, onBack: () -> Unit, onOpenEntry: (Lon
     val context = LocalContext.current
     val pickCover = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) vm.setCover(context, uri)
+    }
+    val exportCsv = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
+        if (uri != null) vm.export(context, uri, xlsx = false)
+    }
+    val exportXlsx = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+    ) { uri -> if (uri != null) vm.export(context, uri, xlsx = true) }
+    val exported by vm.exported.collectAsStateWithLifecycle()
+    val exportedMsg = exported?.let { androidx.compose.ui.res.stringResource(R.string.data_exported, it) }
+    androidx.compose.runtime.LaunchedEffect(exportedMsg) {
+        if (exportedMsg != null) {
+            android.widget.Toast.makeText(context, exportedMsg, android.widget.Toast.LENGTH_SHORT).show()
+            vm.exported.value = null
+        }
     }
     val scope = rememberCoroutineScope()
     val normal = playlist?.kind == PlaylistKind.NORMAL
@@ -167,6 +196,15 @@ fun PlaylistDetailScreen(playlistId: Long, onBack: () -> Unit, onOpenEntry: (Lon
                                     onClick = { menuOpen = false; vm.removeCover() },
                                 )
                             }
+                            val fileName = "lingua_player_" + (p?.name ?: "playlist").replace(Regex("[\\\\/:*?\"<>|]"), "_")
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.playlist_export_csv)) },
+                                onClick = { menuOpen = false; exportCsv.launch("$fileName.csv") },
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.playlist_export_xlsx)) },
+                                onClick = { menuOpen = false; exportXlsx.launch("$fileName.xlsx") },
+                            )
                         }
                     }
                 },

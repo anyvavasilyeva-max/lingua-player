@@ -5,6 +5,8 @@ import io.github.linguaplayer.data.db.AppDatabase
 import io.github.linguaplayer.data.db.LanguagePairEntity
 import io.github.linguaplayer.data.repo.EntryRepository
 import io.github.linguaplayer.data.repo.CoverStore
+import io.github.linguaplayer.data.repo.ExportRepository
+import io.github.linguaplayer.data.backup.BackupRepository
 import io.github.linguaplayer.data.repo.ImportRepository
 import io.github.linguaplayer.data.repo.LanguagePairRepository
 import io.github.linguaplayer.data.repo.PlaylistRepository
@@ -44,6 +46,7 @@ class AppContainer(private val context: Context) {
     val playlists = PlaylistRepository(database, entries)
     val languagePairs = LanguagePairRepository(database)
     val covers = CoverStore(context)
+    val exporter = ExportRepository(database)
     val importer = ImportRepository(database, tags)
 
     /** Область для долгих операций (импорт), которые не должны прерываться при уходе с экрана. */
@@ -122,6 +125,12 @@ class AppContainer(private val context: Context) {
             }
     }
 
+    /** Восстановление из копии: плеер останавливается (очередь ссылается на старые данные). */
+    suspend fun restoreBackup(data: io.github.linguaplayer.data.backup.BackupData): io.github.linguaplayer.data.backup.RestoreResult {
+        withContext(Dispatchers.Main) { player.clear() }
+        return backup.restore(data)
+    }
+
     /** Запуск воспроизведения набора записей (плейлист, библиотека, выборка). */
     suspend fun startPlayback(title: String, entries: List<EntryEntity>, playlistId: Long? = null, startEntryId: Long? = null) {
         val pairs = languagePairs.getAll().associateBy { it.id }
@@ -131,6 +140,12 @@ class AppContainer(private val context: Context) {
         playlistId?.let { playlists.markOpened(it) }
     }
     val settings = SettingsRepository(context)
+    val backup = BackupRepository(
+        database,
+        settings,
+        File(context.filesDir, "covers"),
+        runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull().orEmpty(),
+    )
 
     /** Активная языковая пара: выбранная в настройках, иначе первая из существующих. */
     val activePair: Flow<LanguagePairEntity?> =

@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     // AGP 9 содержит встроенную поддержку Kotlin, отдельный плагин kotlin-android не нужен.
     alias(libs.plugins.android.application)
@@ -14,13 +16,49 @@ android {
         applicationId = "io.github.linguaplayer"
         minSdk = 26
         targetSdk = 36
-        versionCode = 10
-        versionName = "0.6.1"
+        versionCode = 11
+        versionName = "1.0.0-rc1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    /*
+     * Подпись release-сборки. Ключ — личный секрет владельца, в репозиторий не попадает.
+     * Источники (первый найденный):
+     *  1) keystore.properties в корне проекта (исключён из git):
+     *     storeFile=/путь/к/lingua-release.jks
+     *     storePassword=...
+     *     keyAlias=lingua
+     *     keyPassword=...
+     *  2) переменные окружения LINGUA_KEYSTORE_FILE, LINGUA_KEYSTORE_PASSWORD,
+     *     LINGUA_KEY_ALIAS, LINGUA_KEY_PASSWORD (для GitHub Actions).
+     * Без ключа собирается неподписанный app-release-unsigned.apk.
+     */
+    val keystoreFile = rootProject.file("keystore.properties")
+    val signing: Map<String, String>? = when {
+        keystoreFile.exists() -> Properties().apply { keystoreFile.inputStream().use { load(it) } }
+            .let { p -> p.stringPropertyNames().associateWith { p.getProperty(it) } }
+        System.getenv("LINGUA_KEYSTORE_FILE") != null -> mapOf(
+            "storeFile" to System.getenv("LINGUA_KEYSTORE_FILE"),
+            "storePassword" to System.getenv("LINGUA_KEYSTORE_PASSWORD").orEmpty(),
+            "keyAlias" to System.getenv("LINGUA_KEY_ALIAS").orEmpty(),
+            "keyPassword" to System.getenv("LINGUA_KEY_PASSWORD").orEmpty(),
+        )
+        else -> null
+    }
+    signingConfigs {
+        if (signing != null) {
+            create("release") {
+                storeFile = file(signing.getValue("storeFile"))
+                storePassword = signing["storePassword"]
+                keyAlias = signing["keyAlias"]
+                keyPassword = signing["keyPassword"]
+            }
+        }
     }
 
     buildTypes {
         release {
+            if (signing != null) signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")

@@ -44,6 +44,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -99,6 +100,7 @@ fun SettingsScreen(onManageTags: () -> Unit, onOpenVoices: () -> Unit) {
     var showColor by remember { mutableStateOf(false) }
     val seed by vm.seedColor.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
     val errMsg = error?.let { errorText(it) }
     val context = LocalContext.current
     val version = remember {
@@ -160,6 +162,9 @@ fun SettingsScreen(onManageTags: () -> Unit, onOpenVoices: () -> Unit) {
                     leadingContent = { Icon(Icons.AutoMirrored.Outlined.Label, null) },
                     headlineContent = { Text(stringResource(R.string.settings_manage_tags)) },
                 )
+                HorizontalDivider()
+                SectionHeader(stringResource(R.string.settings_data))
+                DataSection(onMessage = { msg -> scope.launch { snackbar.showSnackbar(msg) } })
                 HorizontalDivider()
                 SectionHeader(stringResource(R.string.settings_about))
                 ListItem(

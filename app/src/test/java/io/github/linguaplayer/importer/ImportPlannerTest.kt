@@ -84,8 +84,8 @@ class ImportPlannerTest {
         val merged = plan.rows[0]
         assertEquals(RowAction.New, merged.action)
         assertEquals("Вилка (столовая)", merged.data!!.translation)
-        assertEquals(listOf("кухня", "TOPIK2"), merged.data!!.tags)
-        assertTrue(merged.data!!.typeFromFile)
+        assertEquals(listOf("кухня", "TOPIK2"), merged.data.tags)
+        assertTrue(merged.data.typeFromFile)
         assertEquals(RowAction.Skip(SkipReason.MERGED_IN_FILE), plan.rows[1].action)
         assertEquals(RowAction.Update(42L), plan.rows[2].action)
     }

@@ -304,4 +304,26 @@
     <string name="player_all_shown">Ответ открыт на всех карточках</string>
     <string name="player_card_hints">Нажмите на 👁 или на карточку, чтобы показать или скрыть ответ.\nУдерживайте 👁, чтобы скрыть или показать ответ сразу на всех карточках.\nЛистайте карточку влево/вправо — без прослушивания.</string>
     <string name="notification_channel">Воспроизведение</string>
+
+    <!-- Данные: экспорт и резервная копия -->
+    <string name="settings_data">Данные</string>
+    <string name="data_export_csv">Экспорт словаря в CSV</string>
+    <string name="data_export_xlsx">Экспорт словаря в Excel (XLSX)</string>
+    <string name="data_export_desc">Записи активной языковой пары: слово, перевод, тип, теги. Файл можно импортировать обратно</string>
+    <string name="data_backup">Создать резервную копию</string>
+    <string name="data_backup_desc">Все языковые пары, записи, теги, плейлисты с порядком и обложками, настройки — в одном файле .lpbackup</string>
+    <string name="data_restore">Восстановить из резервной копии</string>
+    <string name="data_restore_desc">Заменяет все текущие данные содержимым файла .lpbackup</string>
+    <string name="data_restore_confirm_title">Восстановить из копии?</string>
+    <string name="data_restore_confirm_text">В копии: языковых пар — %1$d, записей — %2$d, плейлистов — %3$d, тегов — %4$d.\n\nВсе текущие данные будут заменены. Если что-то пойдёт не так, текущие данные останутся без изменений.</string>
+    <string name="data_restore_confirm">Заменить данные</string>
+    <string name="data_exported">Экспортировано записей: %1$d</string>
+    <string name="data_backup_created">Резервная копия создана</string>
+    <string name="data_restored">Восстановлено: записей — %1$d, плейлистов — %2$d</string>
+    <string name="data_err_not_backup">Это не резервная копия Lingua Player</string>
+    <string name="data_err_newer">Копия создана более новой версией приложения — обновите приложение</string>
+    <string name="data_err_corrupted">Файл копии повреждён. Текущие данные не изменены</string>
+    <string name="data_err_io">Не удалось прочитать или записать файл. Текущие данные не изменены</string>
+    <string name="playlist_export_csv">Экспорт в CSV</string>
+    <string name="playlist_export_xlsx">Экспорт в Excel</string>
 </resources>
