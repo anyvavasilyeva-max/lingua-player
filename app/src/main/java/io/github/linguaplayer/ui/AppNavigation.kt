@@ -75,7 +75,7 @@ fun LinguaNavHost(nav: NavHostController = rememberNavController()) {
     Scaffold(
         bottomBar = {
             Column {
-            if (showMini) MiniPlayer(player, onOpen = { nav.navigate(Routes.PLAYER) { launchSingleTop = true } })
+            if (showMini) MiniPlayer(player, onOpen = { nav.navigate(Routes.PLAYER) { launchSingleTop = true } }, aboveNavigationBar = showBar)
             if (showBar) {
                 NavigationBar {
                     topLevel.forEach { item ->
