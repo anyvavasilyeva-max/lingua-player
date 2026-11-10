@@ -55,6 +55,10 @@ class TtsMediaPlayer(
         Player.COMMAND_GET_METADATA,
         Player.COMMAND_SET_REPEAT_MODE,
         Player.COMMAND_RELEASE,
+        Player.COMMAND_PREPARE,
+        // Нужны для «возобновления воспроизведения» (кнопка ▶ на наушниках, когда приложение закрыто).
+        Player.COMMAND_SET_MEDIA_ITEM,
+        Player.COMMAND_CHANGE_MEDIA_ITEMS,
     ).build()
 
     // Подписка — последней: к этому моменту все поля уже инициализированы.
@@ -139,6 +143,21 @@ class TtsMediaPlayer(
         )
         return Futures.immediateVoidFuture()
     }
+
+    /**
+     * Media3 вызывает это при возобновлении воспроизведения (см. PlaybackService.onPlaybackResumption):
+     * передаёт ту же очередь, что уже восстановлена в движке, — меняется только текущая позиция.
+     * Произвольные списки от внешних приложений очередь словаря не заменяют.
+     */
+    override fun handleSetMediaItems(mediaItems: MutableList<MediaItem>, startIndex: Int, startPositionMs: Long): ListenableFuture<*> {
+        val st = engine.state.value
+        val sameQueue = mediaItems.map { it.mediaId } == st.queue.map { it.entryId.toString() }
+        if (sameQueue && startIndex in st.queue.indices && startIndex != st.index) engine.seekTo(startIndex)
+        return Futures.immediateVoidFuture()
+    }
+
+    /** Текущая очередь как MediaItem (для возобновления воспроизведения). */
+    fun currentMediaItems(): List<MediaItem> = playlistFor(engine.state.value).map { it.mediaItem }
 
     override fun handleRelease(): ListenableFuture<*> {
         job.cancel()

@@ -128,7 +128,8 @@ class PlaylistRepository(
             val ids = dao.getEntryIdsOrdered(playlistId).toMutableList()
             if (from !in ids.indices || to !in ids.indices || from == to) return@withTransaction
             ids.add(to, ids.removeAt(from))
-            ids.forEachIndexed { index, entryId -> dao.setPosition(playlistId, entryId, index) }
+            // Перенумеровываются только позиции между from и to, а не весь плейлист.
+            for (index in minOf(from, to)..maxOf(from, to)) dao.setPosition(playlistId, ids[index], index)
         }
     }
 

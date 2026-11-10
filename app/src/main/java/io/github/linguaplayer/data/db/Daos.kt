@@ -109,6 +109,19 @@ interface EntryDao {
     )
     fun observeHasSystemTag(entryId: Long, systemKey: String): Flow<Boolean>
 
+    /** Связи тегов только для записей одной пары — для списков (не грузим теги других пар). */
+    @Query("SELECT et.* FROM entry_tags et JOIN entries e ON e.id = et.entry_id WHERE e.pair_id = :pairId")
+    fun observeTagLinksForPair(pairId: Long): Flow<List<EntryTagCrossRef>>
+
+    @Query("SELECT * FROM entry_tags")
+    suspend fun getAllTagLinks(): List<EntryTagCrossRef>
+
+    /** entryId → id тегов (для экспорта). Читается целиком: так нет ограничения 999 параметров. */
+    suspend fun tagLinksForEntries(entryIds: List<Long>): Map<Long, List<Long>> {
+        val wanted = entryIds.toHashSet()
+        return getAllTagLinks().filter { it.entryId in wanted }.groupBy({ it.entryId }, { it.tagId })
+    }
+
     @Query("SELECT * FROM entry_tags")
     fun observeAllTagLinks(): Flow<List<EntryTagCrossRef>>
 }
@@ -243,4 +256,32 @@ interface PlaylistDao {
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertSmartTags(refs: List<SmartPlaylistTagCrossRef>)
+}
+
+/** Массовые операции для резервной копии: чтение всего и полная замена данных. */
+@Dao
+interface BackupDao {
+    @Query("SELECT * FROM language_pairs ORDER BY id") suspend fun pairs(): List<LanguagePairEntity>
+    @Query("SELECT * FROM tags ORDER BY id") suspend fun tags(): List<TagEntity>
+    @Query("SELECT * FROM entries ORDER BY id") suspend fun entries(): List<EntryEntity>
+    @Query("SELECT * FROM entry_tags") suspend fun entryTags(): List<EntryTagCrossRef>
+    @Query("SELECT * FROM playlists ORDER BY id") suspend fun playlists(): List<PlaylistEntity>
+    @Query("SELECT * FROM playlist_entries ORDER BY playlist_id, position, entry_id") suspend fun playlistEntries(): List<PlaylistEntryCrossRef>
+    @Query("SELECT * FROM smart_playlist_tags") suspend fun smartTags(): List<SmartPlaylistTagCrossRef>
+
+    @Query("DELETE FROM smart_playlist_tags") suspend fun clearSmartTags()
+    @Query("DELETE FROM playlist_entries") suspend fun clearPlaylistEntries()
+    @Query("DELETE FROM entry_tags") suspend fun clearEntryTags()
+    @Query("DELETE FROM playlists") suspend fun clearPlaylists()
+    @Query("DELETE FROM entries") suspend fun clearEntries()
+    @Query("DELETE FROM tags") suspend fun clearTags()
+    @Query("DELETE FROM language_pairs") suspend fun clearPairs()
+
+    @Insert suspend fun insertPairs(items: List<LanguagePairEntity>)
+    @Insert suspend fun insertTags(items: List<TagEntity>)
+    @Insert suspend fun insertEntries(items: List<EntryEntity>)
+    @Insert(onConflict = OnConflictStrategy.IGNORE) suspend fun insertEntryTags(items: List<EntryTagCrossRef>)
+    @Insert suspend fun insertPlaylists(items: List<PlaylistEntity>)
+    @Insert(onConflict = OnConflictStrategy.IGNORE) suspend fun insertPlaylistEntries(items: List<PlaylistEntryCrossRef>)
+    @Insert(onConflict = OnConflictStrategy.IGNORE) suspend fun insertSmartTags(items: List<SmartPlaylistTagCrossRef>)
 }

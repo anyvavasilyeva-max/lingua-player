@@ -36,9 +36,11 @@ class PlaybackGuardTest {
     private fun focusListener() = shadowOf(audioManager).lastAudioFocusRequest!!.listener!!
     private fun wakeLockHeld() = ShadowPowerManager.getLatestWakeLock()?.isHeld == true
 
+    private lateinit var guard: PlaybackGuard
+
     @Before
     fun setUp() {
-        PlaybackGuard(context, engine, scope)
+        guard = PlaybackGuard(context, engine, scope)
         engine.load(source(), autoplay = false)
         idle()
     }
@@ -126,5 +128,16 @@ class PlaybackGuardTest {
         engine.play() // нажали ▶ во время разговора
         idle()
         assertFalse(engine.state.value.isPlaying)
+    }
+
+    @Test
+    fun silentStreamRunsOnlyWhilePlaying() {
+        // Неслышимый поток нужен, чтобы медиакнопки гарнитуры приходили в наше приложение.
+        assertFalse(guard.silence.isRunning)
+        engine.play(); idle()
+        assertTrue(guard.silence.isRunning)
+        engine.pause(); idle()
+        Thread.sleep(100)
+        assertFalse(guard.silence.isRunning)
     }
 }

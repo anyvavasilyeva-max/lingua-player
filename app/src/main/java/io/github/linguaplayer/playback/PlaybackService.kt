@@ -11,6 +11,8 @@ import io.github.linguaplayer.LinguaApp
 import io.github.linguaplayer.MainActivity
 import io.github.linguaplayer.R
 import kotlinx.coroutines.launch
+import com.google.common.util.concurrent.ListenableFuture
+import com.google.common.util.concurrent.SettableFuture
 
 /**
  * Фоновое воспроизведение (foreground service типа mediaPlayback).
@@ -43,7 +45,37 @@ class PlaybackService : MediaSessionService() {
                 .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
-        session = MediaSession.Builder(this, player).setSessionActivity(openPlayer).build()
+        session = MediaSession.Builder(this, player)
+            .setSessionActivity(openPlayer)
+            .setCallback(ResumptionCallback(c, player))
+            .build()
+    }
+
+    /**
+     * Кнопка ▶ на наушниках/в системных медиа-контролах, когда приложение не запущено:
+     * система будит сервис через MediaButtonReceiver, а здесь возвращается сохранённая очередь.
+     */
+    private class ResumptionCallback(
+        private val c: io.github.linguaplayer.AppContainer,
+        private val player: TtsMediaPlayer,
+    ) : MediaSession.Callback {
+        override fun onPlaybackResumption(
+            mediaSession: MediaSession,
+            controller: MediaSession.ControllerInfo,
+            isForPlayback: Boolean,
+        ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> {
+            val future = SettableFuture.create<MediaSession.MediaItemsWithStartPosition>()
+            c.mainScope.launch {
+                c.playbackRestored.await()
+                val st = c.player.state.value
+                if (st.hasQueue) {
+                    future.set(MediaSession.MediaItemsWithStartPosition(player.currentMediaItems(), st.index, 0))
+                } else {
+                    future.setException(UnsupportedOperationException("nothing to resume"))
+                }
+            }
+            return future
+        }
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session

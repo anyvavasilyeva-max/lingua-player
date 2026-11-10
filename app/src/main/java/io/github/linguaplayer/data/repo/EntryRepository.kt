@@ -28,7 +28,8 @@ class EntryRepository(
     fun observeEntries(filter: EntryFilter): Flow<List<EntryWithTags>> =
         combine(
             entryDao.observeQuery(EntryQueryBuilder.build(filter)),
-            entryDao.observeAllTagLinks(),
+            // Для пары — только её связи тегов (в 3 раза меньше данных при 3 парах).
+            filter.pairId?.let { entryDao.observeTagLinksForPair(it) } ?: entryDao.observeAllTagLinks(),
             tagDao.observeAll(),
         ) { entries, links, tags -> attachTags(entries, links, tags) }
 

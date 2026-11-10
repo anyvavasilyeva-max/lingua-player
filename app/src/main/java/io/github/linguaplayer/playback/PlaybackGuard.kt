@@ -27,6 +27,9 @@ import kotlinx.coroutines.launch
  *   присылает временную потерю.
  * - **Отключение наушников / Bluetooth** (ACTION_AUDIO_BECOMING_NOISY) → пауза, чтобы речь
  *   не зазвучала из динамика.
+ * - **Медиакнопки гарнитуры/Bluetooth.** Пока идёт воспроизведение, в нашем процессе играет
+ *   неслышимый поток [SilentAudioTrack] — иначе Android считает звучащим приложение TTS-движка
+ *   и отправляет кнопки ему, а не в нашу MediaSession.
  * - **Wake lock.** Пока идёт воспроизведение, держится PARTIAL_WAKE_LOCK: речь синтезирует и
  *   проигрывает процесс TTS-движка, а паузы между фразами отсчитывает наш процесс — без
  *   wake lock при выключенном экране процессор засыпает и паузы растягиваются.
@@ -49,6 +52,7 @@ class PlaybackGuard(
     /** Игнорировать собственную паузу, вызванную потерей фокуса, при отслеживании состояния. */
     private var pausedByFocus = false
     private var noisyRegistered = false
+    val silence = SilentAudioTrack()
     /** true, пока пауза вызвана самим PlaybackGuard (а не пользователем). */
     private var internalPause = false
 
@@ -101,9 +105,11 @@ class PlaybackGuard(
         }
         registerNoisy()
         acquireWakeLock()
+        silence.start()
     }
 
     private fun onStopped() {
+        silence.stop()
         releaseWakeLock()
         unregisterNoisy()
         // При временной потере фокуса запрос не отзываем — ждём возвращения фокуса.

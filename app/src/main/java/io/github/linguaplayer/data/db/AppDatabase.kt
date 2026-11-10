@@ -36,6 +36,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun entryDao(): EntryDao
     abstract fun tagDao(): TagDao
     abstract fun playlistDao(): PlaylistDao
+    abstract fun backupDao(): BackupDao
 
     companion object {
         const val FILE_NAME = "lingua_player.db"

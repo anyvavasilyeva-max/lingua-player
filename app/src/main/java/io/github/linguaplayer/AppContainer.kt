@@ -59,6 +59,9 @@ class AppContainer(private val context: Context) {
     @VisibleForTesting
     var playerSpeechOverride: SpeechEngine? = null
 
+    /** Завершено, когда сохранённая очередь восстановлена (или её не было). */
+    val playbackRestored = kotlinx.coroutines.CompletableDeferred<Unit>()
+
     /** Сохранённая очередь и позиция (восстанавливаются после закрытия приложения). */
     val playbackStore = PlaybackStateStore(File(context.filesDir, "playback/queue.json"))
 
@@ -66,7 +69,11 @@ class AppContainer(private val context: Context) {
         PlayerEngine(mainScope, playerSpeechOverride ?: speech).also { p ->
             PlaybackGuard(context, p, mainScope)
             mainScope.launch {
-                restorePlayback(p)
+                try {
+                    restorePlayback(p)
+                } finally {
+                    playbackRestored.complete(Unit)
+                }
                 persistPlayback(p)
             }
             mainScope.launch { settings.playback.collect { p.updateSettings(it) } }
