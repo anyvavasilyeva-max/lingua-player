@@ -69,6 +69,27 @@ class PlayerEngine(
         }
     }
 
+    /** Источник текущей очереди (для сохранения и восстановления после перезапуска). */
+    fun currentSource(): PlaybackSource? = source
+
+    /**
+     * Восстанавливает сохранённую очередь без воспроизведения: [order] — пары (id записи,
+     * «сначала изучаемый язык»). Записи, которых больше нет в [src], пропускаются.
+     */
+    fun restore(src: PlaybackSource, order: List<Pair<Long, Boolean>>, index: Int) {
+        val byId = src.entries.associateBy { it.id }
+        val queue = order.mapNotNull { (id, sourceFirst) ->
+            val e = byId[id] ?: return@mapNotNull null
+            val pair = src.pairs[e.pairId] ?: return@mapNotNull null
+            QueueItem(e.id, e.pairId, e.source, e.translation, e.type, pair.sourceLang, pair.targetLang, sourceFirst)
+        }
+        if (queue.isEmpty()) return
+        source = src
+        restart(false) {
+            it.copy(title = src.title, playlistId = src.playlistId, queue = queue, index = index.coerceIn(0, queue.lastIndex), ended = false, error = null)
+        }
+    }
+
     /** Новые настройки. Если изменились направление/тип/порядок — очередь перестраивается с сохранением текущей записи. */
     fun updateSettings(new: PlaybackSettings) {
         val old = _state.value.settings
@@ -92,7 +113,15 @@ class PlayerEngine(
         restart(true) { if (it.ended) it.copy(index = 0, ended = false, error = null) else it.copy(error = null) }
     }
 
-    fun pause() = restart(false) { it }
+    /** Слушатели паузы, запрошенной извне (кнопка, уведомление, гарнитура или система). */
+    private val pauseListeners = mutableListOf<() -> Unit>()
+
+    fun addPauseListener(listener: () -> Unit) { pauseListeners += listener }
+
+    fun pause() {
+        pauseListeners.forEach { it() }
+        restart(false) { it }
+    }
 
     fun togglePlay() = if (_state.value.isPlaying) pause() else play()
 

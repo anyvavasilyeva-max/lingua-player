@@ -13,6 +13,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
@@ -65,12 +66,16 @@ private val topLevel = listOf(
 )
 
 @Composable
-fun LinguaNavHost(nav: NavHostController = rememberNavController()) {
+fun LinguaNavHost(nav: NavHostController = rememberNavController(), openPlayerRequest: Int = 0) {
     val backStack by nav.currentBackStackEntryAsState()
     val currentRoute = backStack?.destination?.route
     val showBar = topLevel.any { it.route == currentRoute }
     val showMini = currentRoute !in setOf(Routes.PLAYER, Routes.ENTRY, Routes.IMPORT, Routes.VOICES)
     val player = appContainer().player
+    // Нажатие на медиа-уведомление открывает плеер.
+    LaunchedEffect(openPlayerRequest) {
+        if (openPlayerRequest > 0) nav.navigate(Routes.PLAYER) { launchSingleTop = true }
+    }
 
     Scaffold(
         bottomBar = {

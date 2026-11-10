@@ -12,6 +12,7 @@ io.github.linguaplayer
 ├── util/TextKeys.kt                — нормализация текста (NFC, регистр, пробелы)
 ├── importer/                       — CSV/XLSX: чтение, сопоставление столбцов, план импорта
 ├── player/                         — плеер: настройки, очередь, план речи, движок, TTS
+├── playback/                       — фон: MediaSessionService, мост Media3, audio focus, сохранение очереди
 ├── data/
 │   ├── db/                         — Room: сущности, DAO, построитель запросов, БД
 │   └── repo/                       — репозитории: записи, теги, плейлисты, языки, настройки
@@ -26,7 +27,6 @@ io.github.linguaplayer
 
 | Пакет | Этап | Назначение |
 |---|---|---|
-| `player/service/` | 4 | `MediaSessionService` + собственный `SimpleBasePlayer`, audio focus, Bluetooth |
 | `backup/` | 5 | Экспорт CSV/XLSX, резервная копия JSON (версионированный формат) |
 
 ## База данных (Room, версия схемы 3)
@@ -131,6 +131,45 @@ PlaybackSettings (DataStore) ────────────┼─▶ Queue
   экранами. На этапе 4 он будет обёрнут в `MediaSessionService` + `SimpleBasePlayer`.
 - Манифест содержит `<queries>` для `TTS_SERVICE` — без этого на Android 11+ нельзя получить
   список движков.
+
+## Фоновое воспроизведение (этап 4)
+
+```
+MainActivity ──MediaController (onStart/onStop)──▶ PlaybackService : MediaSessionService
+                                                     └─ MediaSession(TtsMediaPlayer)
+экран блокировки, шторка, Bluetooth, часы, авто ──▶ MediaSession ──▶ TtsMediaPlayer
+                                                                      (SimpleBasePlayer)
+                                                                           │ play/pause/seek/repeat
+UI приложения ───────────────────────────────────────────────────────────▶ PlayerEngine ◀── PlaybackGuard
+                                                                           │                 (audio focus,
+                                                                           ▼                  noisy, wake lock)
+                                                                      AndroidTtsEngine
+```
+
+- **`TtsMediaPlayer`** — `SimpleBasePlayer`: состояние Media3 строится из `PlayerState`
+  (очередь → плейлист `MediaItemData`, корейский → title, перевод → artist, плейлист → album),
+  команды Media3 → методы движка. Плейлист пересобирается только при смене очереди.
+  Позиции/длительности нет (у синтеза речи её нет заранее) — перемотки на экране блокировки нет.
+  Перемешивание для Media3 не сообщается: очередь уже перемешана движком, иначе Media3
+  вычислял бы «следующую» по своему случайному порядку.
+- **`PlaybackService`** — Media3 сам показывает медиа-уведомление (`DefaultMediaNotificationProvider`)
+  и переводит сервис в foreground (`mediaPlayback`) во время воспроизведения. Сервис стартует,
+  когда экран подключает `MediaController`; при уходе экрана в фон играющий сервис остаётся
+  foreground. `onTaskRemoved`: не играет — `stopSelf()`.
+- **`PlaybackGuard`** (живёт с движком, не зависит от сервиса):
+  audio focus (`USAGE_MEDIA/CONTENT_TYPE_SPEECH`, `willPauseWhenDucked`): временная потеря →
+  пауза и продолжение после возврата; постоянная → пауза; пауза пользователем во время
+  потери отменяет автопродолжение; ▶ во время звонка снова запрашивает фокус и получает отказ.
+  `ACTION_AUDIO_BECOMING_NOISY` → пауза. `PARTIAL_WAKE_LOCK` на время воспроизведения
+  (речь играет процесс TTS, а паузы между фразами отсчитывает наш процесс — без wake lock
+  при выключенном экране они бы растягивались).
+- **`PlaybackStateStore`** — `files/playback/queue.json` (версия формата 1): заголовок,
+  плейлист, исходные id, очередь (id + направление) и позиция. Пишется атомарно при смене
+  очереди/позиции (debounce 0,5 с); при запуске очередь восстанавливается на паузе, удалённые
+  записи пропускаются, очередь другой языковой пары не восстанавливается.
+- Разрешения APK: `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_MEDIA_PLAYBACK`, `WAKE_LOCK`.
+  `ACCESS_NETWORK_STATE` из Media3 удалён (`tools:node="remove"`), `INTERNET` не запрашивается.
+  `POST_NOTIFICATIONS` не нужен: медиа-уведомления MediaSession в Android 13+ разрешены без него.
 
 ## Оформление
 

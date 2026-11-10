@@ -22,6 +22,13 @@ import io.github.linguaplayer.data.db.EntryEntity
 import io.github.linguaplayer.player.AndroidTtsEngine
 import io.github.linguaplayer.player.PlaybackSource
 import io.github.linguaplayer.player.PlayerEngine
+import io.github.linguaplayer.playback.PlaybackGuard
+import io.github.linguaplayer.playback.PlaybackStateStore
+import io.github.linguaplayer.playback.SavedPlayback
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.withContext
+import java.io.File
 import io.github.linguaplayer.player.SpeechEngine
 import androidx.annotation.VisibleForTesting
 import kotlinx.coroutines.flow.combine
@@ -52,8 +59,16 @@ class AppContainer(private val context: Context) {
     @VisibleForTesting
     var playerSpeechOverride: SpeechEngine? = null
 
+    /** Сохранённая очередь и позиция (восстанавливаются после закрытия приложения). */
+    val playbackStore = PlaybackStateStore(File(context.filesDir, "playback/queue.json"))
+
     val player: PlayerEngine by lazy {
         PlayerEngine(mainScope, playerSpeechOverride ?: speech).also { p ->
+            PlaybackGuard(context, p, mainScope)
+            mainScope.launch {
+                restorePlayback(p)
+                persistPlayback(p)
+            }
             mainScope.launch { settings.playback.collect { p.updateSettings(it) } }
             // Библиотеки пар не пересекаются: при переключении пары очередь другой пары сбрасывается.
             mainScope.launch {
@@ -65,6 +80,39 @@ class AppContainer(private val context: Context) {
                 mainScope.launch { settings.ttsEngine.collect { speech.setEnginePackage(it) } }
             }
         }
+    }
+
+    /** Восстанавливает сохранённую очередь (на паузе), если она относится к активной паре. */
+    private suspend fun restorePlayback(p: PlayerEngine) {
+        val saved = withContext(Dispatchers.IO) { playbackStore.load() } ?: return
+        if (p.state.value.hasQueue) return
+        p.updateSettings(settings.playback.first())
+        val active = activePair.first() ?: return
+        val byId = saved.sourceIds.chunked(500).flatMap { database.entryDao().getByIds(it) }.associateBy { it.id }
+        val entries = saved.sourceIds.mapNotNull { byId[it] }.filter { it.pairId == active.id }
+        if (entries.isEmpty() || p.state.value.hasQueue) return
+        val pairs = languagePairs.getAll().associateBy { it.id }
+        p.restore(PlaybackSource(saved.title, entries, pairs, saved.playlistId), saved.order, saved.index)
+    }
+
+    /** Сохраняет очередь при её смене и позицию при переходе к другой записи. */
+    @OptIn(FlowPreview::class)
+    private suspend fun persistPlayback(p: PlayerEngine) {
+        p.state
+            .map { st -> Triple(System.identityHashCode(st.queue), st.index, st.title) }
+            .distinctUntilChanged()
+            .debounce(500)
+            .collect {
+                val st = p.state.value
+                val saved = if (!st.hasQueue) null else SavedPlayback(
+                    title = st.title,
+                    playlistId = st.playlistId,
+                    sourceIds = p.currentSource()?.entries?.map { it.id }.orEmpty(),
+                    order = st.queue.map { it.entryId to it.sourceFirst },
+                    index = st.index,
+                )
+                withContext(Dispatchers.IO) { runCatching { playbackStore.save(saved) } }
+            }
     }
 
     /** Запуск воспроизведения набора записей (плейлист, библиотека, выборка). */

@@ -303,4 +303,5 @@
     <string name="player_all_hidden">Ответ скрыт на всех карточках</string>
     <string name="player_all_shown">Ответ открыт на всех карточках</string>
     <string name="player_card_hints">Нажмите на 👁 или на карточку, чтобы показать или скрыть ответ.\nУдерживайте 👁, чтобы скрыть или показать ответ сразу на всех карточках.\nЛистайте карточку влево/вправо — без прослушивания.</string>
+    <string name="notification_channel">Воспроизведение</string>
 </resources>
