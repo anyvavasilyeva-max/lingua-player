@@ -13,8 +13,13 @@ open class LinguaApp : Application() {
      */
     open val connectPlaybackService: Boolean get() = true
 
+    /** Следить за изменениями для автокопии. В тестах включается явно, чтобы тесты не мешали друг другу. */
+    open val startAutoBackup: Boolean get() = true
+
     override fun onCreate() {
         super.onCreate()
         container = AppContainer(this)
+        // Подписка на изменения данных и расписание автокопии.
+        if (startAutoBackup) container.autoBackup.start(container.appScope)
     }
 }

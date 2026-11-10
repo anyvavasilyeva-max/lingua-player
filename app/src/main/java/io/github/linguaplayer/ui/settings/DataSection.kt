@@ -11,6 +11,15 @@ import androidx.compose.material.icons.outlined.Backup
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.GridOn
 import androidx.compose.material.icons.outlined.Restore
+import androidx.compose.material.icons.outlined.CloudSync
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
+import androidx.compose.ui.semantics.Role
+import io.github.linguaplayer.data.repo.AutoBackupSettings
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.stateIn
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -50,6 +59,9 @@ sealed interface DataMessage {
     data object BackupCreated : DataMessage
     data class Restored(val entries: Int, val playlists: Int) : DataMessage
     data class Failed(val reason: Int) : DataMessage
+    data object AutoDone : DataMessage
+    data object AutoEmpty : DataMessage
+    data class AutoFailed(val message: String) : DataMessage
 }
 
 data class DataUiState(
@@ -131,6 +143,39 @@ class DataViewModel(private val c: AppContainer) : ViewModel() {
     }
 
     fun cancelRestore() = state.update { it.copy(pending = null) }
+
+    // --- Автокопия ---
+    val auto = c.settings.autoBackup.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AutoBackupSettings())
+
+    /** Файл автокопии выбран (создан) пользователем: запомнить с постоянным доступом и включить. */
+    fun setAutoTarget(context: Context, uri: Uri) = viewModelScope.launch {
+        runCatching {
+            context.contentResolver.takePersistableUriPermission(
+                uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+            )
+        }
+        val name = runCatching {
+            context.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)
+                ?.use { if (it.moveToFirst()) it.getString(0) else null }
+        }.getOrNull() ?: uri.lastPathSegment
+        c.settings.setAutoBackupTarget(uri.toString(), name)
+        c.settings.setAutoBackupEnabled(true)
+        backupNow()
+    }
+
+    fun disableAuto() = viewModelScope.launch { c.settings.setAutoBackupEnabled(false) }
+    fun enableAuto() = viewModelScope.launch { c.settings.setAutoBackupEnabled(true); backupNow() }
+
+    fun backupNow() = viewModelScope.launch {
+        state.update { it.copy(busy = true) }
+        val msg = when (val r = c.autoBackup.runNow()) {
+            io.github.linguaplayer.data.backup.AutoBackup.Result.Done -> DataMessage.AutoDone
+            io.github.linguaplayer.data.backup.AutoBackup.Result.EmptyLibrary -> DataMessage.AutoEmpty
+            io.github.linguaplayer.data.backup.AutoBackup.Result.Disabled -> null
+            is io.github.linguaplayer.data.backup.AutoBackup.Result.Failed -> DataMessage.AutoFailed(r.message)
+        }
+        state.update { it.copy(busy = false, message = msg) }
+    }
     fun consumeMessage() = state.update { it.copy(message = null) }
 }
 
@@ -162,11 +207,33 @@ fun DataSection(onMessage: (String) -> Unit) {
         DataMessage.BackupCreated -> stringResource(R.string.data_backup_created)
         is DataMessage.Restored -> stringResource(R.string.data_restored, m.entries, m.playlists)
         is DataMessage.Failed -> stringResource(m.reason)
+        DataMessage.AutoDone -> stringResource(R.string.auto_done)
+        DataMessage.AutoEmpty -> stringResource(R.string.auto_empty)
+        is DataMessage.AutoFailed -> stringResource(R.string.auto_failed, m.message)
         null -> null
     }
     LaunchedEffect(text) { if (text != null) { onMessage(text); vm.consumeMessage() } }
 
+    val auto by vm.auto.collectAsStateWithLifecycle()
+    val chooseAutoFile = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
+        uri?.let { vm.setAutoTarget(context, it) }
+    }
+
     Column {
+        AutoBackupBlock(
+            auto = auto,
+            busy = s.busy,
+            onToggle = { on ->
+                when {
+                    !on -> vm.disableAuto()
+                    auto.targetUri == null -> chooseAutoFile.launch("lingua_player_autobackup.lpbackup")
+                    else -> vm.enableAuto()
+                }
+            },
+            onChooseFile = { chooseAutoFile.launch("lingua_player_autobackup.lpbackup") },
+            onBackupNow = vm::backupNow,
+        )
+        HorizontalDivider()
         ListItem(
             modifier = Modifier.clickable(enabled = !s.busy) { exportCsv.launch("${baseName.ifEmpty { "lingua_player" }}.csv") },
             leadingContent = { Icon(Icons.Outlined.Description, null) },
@@ -208,6 +275,40 @@ fun DataSection(onMessage: (String) -> Unit) {
             },
             confirmButton = { TextButton(onClick = vm::confirmRestore) { Text(stringResource(R.string.data_restore_confirm)) } },
             dismissButton = { TextButton(onClick = vm::cancelRestore) { Text(stringResource(R.string.action_cancel)) } },
+        )
+    }
+}
+
+@Composable
+private fun AutoBackupBlock(
+    auto: AutoBackupSettings,
+    busy: Boolean,
+    onToggle: (Boolean) -> Unit,
+    onChooseFile: () -> Unit,
+    onBackupNow: () -> Unit,
+) {
+    ListItem(
+        modifier = Modifier.toggleable(auto.enabled, role = Role.Switch, onValueChange = onToggle),
+        leadingContent = { Icon(Icons.Outlined.CloudSync, null) },
+        headlineContent = { Text(stringResource(R.string.auto_title)) },
+        supportingContent = { Text(stringResource(R.string.auto_desc)) },
+        trailingContent = { Switch(checked = auto.enabled, onCheckedChange = null) },
+    )
+    if (auto.enabled || auto.targetUri != null) {
+        ListItem(
+            modifier = Modifier.clickable(enabled = !busy, onClick = onChooseFile),
+            headlineContent = { Text(stringResource(R.string.auto_file)) },
+            supportingContent = { Text(auto.targetName ?: stringResource(R.string.auto_file_none)) },
+        )
+        val last = auto.lastAt?.let {
+            java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.MEDIUM, java.text.DateFormat.SHORT).format(java.util.Date(it))
+        }
+        ListItem(
+            headlineContent = { Text(stringResource(R.string.auto_last, last ?: stringResource(R.string.auto_never))) },
+            supportingContent = auto.lastError?.let { err -> { Text(stringResource(R.string.auto_failed, err), color = MaterialTheme.colorScheme.error) } },
+            trailingContent = {
+                TextButton(onClick = onBackupNow, enabled = auto.enabled && !busy) { Text(stringResource(R.string.auto_now)) }
+            },
         )
     }
 }

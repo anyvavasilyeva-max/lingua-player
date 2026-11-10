@@ -20,6 +20,15 @@ import kotlinx.coroutines.flow.map
 
 private val Context.dataStore by preferencesDataStore(name = "settings")
 
+data class AutoBackupSettings(
+    val enabled: Boolean = false,
+    /** Файл автокопии (content:// URI с постоянным доступом), например на Google Диске. */
+    val targetUri: String? = null,
+    val targetName: String? = null,
+    val lastAt: Long? = null,
+    val lastError: String? = null,
+)
+
 /** Цвет оформления по умолчанию — #00B2D1. */
 const val DEFAULT_SEED_COLOR: Int = 0xFF00B2D1.toInt()
 
@@ -41,6 +50,11 @@ class SettingsRepository(private val context: Context) {
         val TTS_ENGINE = stringPreferencesKey("tts_engine")
         val SEED_COLOR = intPreferencesKey("ui_seed_color")
         val PLAYLISTS_GRID = booleanPreferencesKey("ui_playlists_grid")
+        val AUTO_ENABLED = booleanPreferencesKey("auto_backup_enabled")
+        val AUTO_TARGET = stringPreferencesKey("auto_backup_target_uri")
+        val AUTO_TARGET_NAME = stringPreferencesKey("auto_backup_target_name")
+        val AUTO_LAST_AT = longPreferencesKey("auto_backup_last_at")
+        val AUTO_LAST_ERROR = stringPreferencesKey("auto_backup_last_error")
     }
 
     val activePairId: Flow<Long?> = context.dataStore.data.map { it[Keys.ACTIVE_PAIR] }
@@ -97,6 +111,36 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setPlaylistsGrid(grid: Boolean) {
         context.dataStore.edit { it[Keys.PLAYLISTS_GRID] = grid }
+    }
+
+    /** Настройки и состояние автоматической резервной копии. */
+    val autoBackup: Flow<AutoBackupSettings> = context.dataStore.data.map {
+        AutoBackupSettings(
+            enabled = it[Keys.AUTO_ENABLED] ?: false,
+            targetUri = it[Keys.AUTO_TARGET],
+            targetName = it[Keys.AUTO_TARGET_NAME],
+            lastAt = it[Keys.AUTO_LAST_AT],
+            lastError = it[Keys.AUTO_LAST_ERROR],
+        )
+    }.distinctUntilChanged()
+
+    suspend fun setAutoBackupEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.AUTO_ENABLED] = enabled }
+    }
+
+    suspend fun setAutoBackupTarget(uri: String?, name: String?) {
+        context.dataStore.edit {
+            if (uri == null) it.remove(Keys.AUTO_TARGET) else it[Keys.AUTO_TARGET] = uri
+            if (name == null) it.remove(Keys.AUTO_TARGET_NAME) else it[Keys.AUTO_TARGET_NAME] = name
+            it.remove(Keys.AUTO_LAST_ERROR)
+        }
+    }
+
+    suspend fun setAutoBackupResult(at: Long?, error: String?) {
+        context.dataStore.edit {
+            if (at != null) it[Keys.AUTO_LAST_AT] = at
+            if (error == null) it.remove(Keys.AUTO_LAST_ERROR) else it[Keys.AUTO_LAST_ERROR] = error
+        }
     }
 
     /** Пакет движка синтеза речи; null — системный по умолчанию. */

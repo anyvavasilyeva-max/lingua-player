@@ -1,7 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Системная резервная копия Android (Google). Собственный экспорт/бэкап — на этапе 5. -->
+<!--
+  Системная резервная копия Android (Google, Android 11 и ниже — это правило; 12+ — data_extraction_rules).
+  База целиком (вместе с журналом -wal: иначе последние изменения Room могли бы не попасть в копию),
+  обложки и настройки. Локальные автокопии и очередь плеера не копируются (лимит 25 МБ).
+-->
 <full-backup-content>
-    <include domain="database" path="lingua_player.db" />
-    <include domain="sharedpref" path="." />
+    <include domain="database" path="." />
+    <include domain="file" path="covers/" />
     <include domain="file" path="datastore/" />
 </full-backup-content>

@@ -108,6 +108,7 @@ fun LinguaNavHost(nav: NavHostController = rememberNavController(), openPlayerRe
                     onOpenPlaylist = { nav.navigate(Routes.playlist(it)) },
                     onImport = { nav.navigate(Routes.IMPORT) },
                     onOpenPlayer = { nav.navigate(Routes.PLAYER) { launchSingleTop = true } },
+                    onOpenSettings = { nav.navigateTopLevel(Routes.SETTINGS) },
                 )
             }
             composable(

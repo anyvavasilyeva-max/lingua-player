@@ -326,4 +326,18 @@
     <string name="data_err_io">Не удалось прочитать или записать файл. Текущие данные не изменены</string>
     <string name="playlist_export_csv">Экспорт в CSV</string>
     <string name="playlist_export_xlsx">Экспорт в Excel</string>
+
+    <!-- Автокопия -->
+    <string name="auto_title">Автоматическая резервная копия</string>
+    <string name="auto_desc">Копия всех библиотек, плейлистов и пометок сохраняется сама — после изменений и раз в день. Выберите файл на Google Диске: на новом телефоне (Android или iPhone) установите приложение и восстановите из этого файла</string>
+    <string name="auto_file">Файл автокопии</string>
+    <string name="auto_file_none">не выбран — нажмите, чтобы выбрать</string>
+    <string name="auto_last">Последняя копия: %1$s</string>
+    <string name="auto_never">ещё не создавалась</string>
+    <string name="auto_now">Создать сейчас</string>
+    <string name="auto_done">Автокопия сохранена</string>
+    <string name="auto_empty">Библиотека пуста — копия не создаётся, чтобы не затереть прежнюю</string>
+    <string name="auto_failed">Не удалось сохранить автокопию: %1$s</string>
+    <string name="home_restore_hint">Переходите с другого телефона? Восстановите библиотеку из резервной копии</string>
+    <string name="home_restore">Восстановить из копии</string>
 </resources>

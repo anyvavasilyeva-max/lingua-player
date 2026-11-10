@@ -46,6 +46,8 @@ class AppContainer(private val context: Context) {
     val playlists = PlaylistRepository(database, entries)
     val languagePairs = LanguagePairRepository(database)
     val covers = CoverStore(context)
+    /** Автокопия; слежение за изменениями запускает LinguaApp (startAutoBackup). */
+    val autoBackup by lazy { io.github.linguaplayer.data.backup.AutoBackup(context, database, backup, settings) }
     val exporter = ExportRepository(database)
     val importer = ImportRepository(database, tags)
 

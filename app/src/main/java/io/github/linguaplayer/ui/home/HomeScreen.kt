@@ -21,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.QueueMusic
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.FileUpload
+import androidx.compose.material.icons.outlined.Restore
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.automirrored.outlined.LibraryBooks
 import androidx.compose.material3.Card
@@ -105,6 +106,7 @@ fun HomeScreen(
     onOpenPlaylist: (Long) -> Unit,
     onImport: () -> Unit,
     onOpenPlayer: () -> Unit,
+    onOpenSettings: () -> Unit = {},
 ) {
     val c = appContainer()
     val vm: HomeViewModel = viewModel { HomeViewModel(c) }
@@ -142,6 +144,18 @@ fun HomeScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 12.dp),
                 )
+            }
+            if (state.entryCount == 0) {
+                Text(
+                    stringResource(R.string.home_restore_hint),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+                OutlinedButton(onClick = onOpenSettings, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                    Icon(Icons.Outlined.Restore, null)
+                    Text(stringResource(R.string.home_restore), Modifier.padding(start = 8.dp))
+                }
             }
             OutlinedButton(onClick = onImport, modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) {
                 Icon(Icons.Outlined.FileUpload, null)
