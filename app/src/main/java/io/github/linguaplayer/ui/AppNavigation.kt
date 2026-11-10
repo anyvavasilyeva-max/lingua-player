@@ -14,6 +14,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
@@ -106,7 +110,12 @@ fun LinguaNavHost(nav: NavHostController = rememberNavController(), openPlayerRe
                     onOpenPlayer = { nav.navigate(Routes.PLAYER) { launchSingleTop = true } },
                 )
             }
-            composable(Routes.PLAYER) {
+            composable(
+                Routes.PLAYER,
+                // Плеер выезжает снизу и уезжает вниз — как в музыкальных приложениях.
+                enterTransition = { slideInVertically(tween(260)) { it } },
+                popExitTransition = { slideOutVertically(tween(220)) { it } + fadeOut(tween(220)) },
+            ) {
                 PlayerScreen(
                     onBack = { nav.popBackStack() },
                     onOpenVoices = { nav.navigate(Routes.VOICES) },

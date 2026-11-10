@@ -28,6 +28,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.flow.first
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -222,10 +223,22 @@ class PlayerFlowTest {
         // Свайп влево по-прежнему листает, а не закрывает.
         rule.onAllNodesWithText("설거지를 하다", useUnmergedTree = true)[0].performTouchInput { swipeLeft() }
         ui.waitText("2 из 3")
-        // Свайп пальцем вниз на ~300 dp от слова на карточке.
-        rule.onAllNodesWithText("숟가락", useUnmergedTree = true)[0].performTouchInput {
-            swipe(start = center, end = center + androidx.compose.ui.geometry.Offset(0f, 300.dp.toPx()), durationMillis = 300)
+        fun top(text: String) = rule.onAllNodesWithText(text, useUnmergedTree = true)[0].fetchSemanticsNode().boundsInRoot.top
+        val titleBefore = top("Сейчас звучит")
+        // positionInRoot — без обрезки по краю экрана (кнопки уезжают за нижний край).
+        val controlsBefore = rule.onAllNodesWithContentDescription("Пауза")[0].fetchSemanticsNode().positionInRoot.y
+        // Палец ведёт карточку вниз и пока не отпущен.
+        val card = rule.onAllNodesWithText("숟가락", useUnmergedTree = true)[0]
+        card.performTouchInput {
+            down(center)
+            repeat(10) { moveBy(androidx.compose.ui.geometry.Offset(0f, 15.dp.toPx())) }
         }
+        rule.waitForIdle()
+        ui.shot("28_player_dragging_down")
+        // Вниз уехал весь экран: и заголовок, и кнопки, а не только карточка.
+        assertTrue("заголовок сместился", top("Сейчас звучит") > titleBefore + 50)
+        assertTrue("кнопки сместились", rule.onAllNodesWithContentDescription("Пауза")[0].fetchSemanticsNode().positionInRoot.y > controlsBefore + 50)
+        card.performTouchInput { up() }
         ui.waitText("Что послушаем?") // главная
         ui.waitText("Корейский → Русский")
         assertEquals(true, c.player.state.value.isPlaying) // прослушивание продолжается

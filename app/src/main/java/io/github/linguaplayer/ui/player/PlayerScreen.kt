@@ -39,8 +39,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.input.pointer.pointerInput
@@ -98,12 +99,28 @@ fun PlayerScreen(onBack: () -> Unit, onOpenVoices: () -> Unit, onCloseToHome: ()
     val hiddenAllMsg = stringResource(R.string.player_all_hidden)
     val shownAllMsg = stringResource(R.string.player_all_shown)
     val item = st.current
+    val dismiss = rememberDismissState(onDismiss = onCloseToHome)
     val sourceName = item?.let { languageDisplayName(it.sourceLang) } ?: stringResource(R.string.ps_studied_language)
     val targetName = item?.let { languageDisplayName(it.targetLang) } ?: stringResource(R.string.ps_translation_language)
 
     Scaffold(
+        // Весь экран плеера уезжает вниз вместе с пальцем.
+        modifier = Modifier.graphicsLayer { translationY = dismiss.offset },
         topBar = {
             TopAppBar(
+                // Свайп вниз можно начинать и с верхней панели.
+                modifier = Modifier.pointerInput(Unit) {
+                    var dy = 0f
+                    detectVerticalDragGestures(
+                        onDragStart = { dy = 0f },
+                        onDragCancel = { dismiss.release(0f) },
+                        onDragEnd = { dismiss.release(dy.coerceAtLeast(0f)) },
+                    ) { change, amount ->
+                        change.consume()
+                        dy += amount
+                        dismiss.drag(dy.coerceAtLeast(0f))
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) { Icon(Icons.Outlined.KeyboardArrowDown, stringResource(R.string.action_back)) }
                 },
@@ -159,7 +176,8 @@ fun PlayerScreen(onBack: () -> Unit, onOpenVoices: () -> Unit, onCloseToHome: ()
                         targetName = targetName + if (!st.settings.translationEnabled) " · " + stringResource(R.string.player_no_translation) else "",
                         onNext = { if (vm.hasNext(st)) vm.next() },
                         onPrevious = { if (vm.hasPrevious(st)) vm.previous() },
-                        onSwipeDown = onCloseToHome,
+                        onDragDown = dismiss::drag,
+                        onDragDownEnd = dismiss::release,
                         onSetAllHidden = { hide ->
                             vm.updateSettings { it.copy(hideAnswer = hide) }
                             // Toast не перекрывает кнопки плеера (в отличие от snackbar).
@@ -270,12 +288,12 @@ private fun FlashCard(
     targetName: String,
     onNext: () -> Unit,
     onPrevious: () -> Unit,
-    onSwipeDown: () -> Unit,
+    /** Свайп вниз: смещение пальца (≥ 0) — экран плеера едет следом. */
+    onDragDown: (Float) -> Unit,
+    /** Палец отпущен: итоговое смещение вниз (0 — жест был горизонтальным или отменён). */
+    onDragDownEnd: (Float) -> Unit,
     onSetAllHidden: (Boolean) -> Unit,
 ) {
-    // Карточка следует за пальцем при свайпе вниз (визуальный отклик); отпустили раньше порога — возвращается.
-    var dragY by remember(item.entryId) { mutableFloatStateOf(0f) }
-    val offsetY by animateFloatAsState(dragY, label = "cardDragY")
     // Короткое нажатие меняет только эту карточку; на следующей действует общий режим [hideAnswer].
     var override by remember(item.entryId, item.sourceFirst, hideAnswer) { mutableStateOf<Boolean?>(null) }
     val answerHidden = override ?: hideAnswer
@@ -284,10 +302,6 @@ private fun FlashCard(
         shape = RoundedCornerShape(28.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
         modifier = Modifier.fillMaxWidth()
-            .graphicsLayer {
-                translationY = offsetY
-                alpha = 1f - (offsetY / (size.height * 2f)).coerceIn(0f, 0.5f)
-            }
             .pointerInput(item.entryId) {
                 // Влево/вправо — следующая/предыдущая; вниз — закрыть плеер и выйти на главную.
                 // Направление определяется по преобладающей оси движения.
@@ -295,21 +309,21 @@ private fun FlashCard(
                 var dy = 0f
                 detectDragGestures(
                     onDragStart = { dx = 0f; dy = 0f },
-                    onDragCancel = { dragY = 0f },
+                    onDragCancel = { onDragDownEnd(0f) },
                     onDragEnd = {
                         val horizontal = kotlin.math.abs(dx) > kotlin.math.abs(dy)
                         when {
                             horizontal && dx < -swipeThreshold -> onNext()
                             horizontal && dx > swipeThreshold -> onPrevious()
-                            !horizontal && dy > swipeThreshold -> onSwipeDown()
                         }
-                        dragY = 0f
+                        onDragDownEnd(if (horizontal) 0f else dy.coerceAtLeast(0f))
                     },
                 ) { change, amount ->
                     change.consume()
                     dx += amount.x
                     dy += amount.y
-                    if (kotlin.math.abs(dy) > kotlin.math.abs(dx)) dragY = dy.coerceAtLeast(0f) * 0.6f
+                    // Пока движение в основном вертикальное — экран следует за пальцем.
+                    onDragDown(if (kotlin.math.abs(dy) > kotlin.math.abs(dx)) dy.coerceAtLeast(0f) else 0f)
                 }
             }
             .clickable { override = !answerHidden },
@@ -341,6 +355,49 @@ private fun FlashCard(
             )
         }
     }
+}
+
+/**
+ * Смахивание экрана плеера вниз: [offset] — текущее смещение экрана.
+ * Отпустили дальше порога — экран доезжает вниз и вызывается [onDismiss]; иначе пружиной возвращается.
+ */
+private class DismissState(
+    private val scope: kotlinx.coroutines.CoroutineScope,
+    private val thresholdPx: Float,
+    private val screenHeightPx: Float,
+    private val onDismiss: () -> Unit,
+) {
+    private val anim = androidx.compose.animation.core.Animatable(0f)
+    private var dismissing = false
+    val offset: Float get() = anim.value
+
+    fun drag(dy: Float) {
+        if (dismissing) return
+        scope.launch { anim.snapTo(dy) }
+    }
+
+    fun release(dy: Float) {
+        if (dismissing) return
+        if (dy > thresholdPx) {
+            dismissing = true
+            scope.launch {
+                anim.animateTo(screenHeightPx, androidx.compose.animation.core.tween(180))
+                onDismiss()
+            }
+        } else {
+            scope.launch { anim.animateTo(0f, androidx.compose.animation.core.spring(dampingRatio = 0.7f)) }
+        }
+    }
+}
+
+@Composable
+private fun rememberDismissState(onDismiss: () -> Unit): DismissState {
+    val scope = rememberCoroutineScope()
+    val density = LocalDensity.current
+    val heightPx = androidx.compose.ui.platform.LocalWindowInfo.current.containerSize.height.toFloat()
+    val thresholdPx = with(density) { 80.dp.toPx() }
+    val latest = androidx.compose.runtime.rememberUpdatedState(onDismiss)
+    return remember(heightPx, thresholdPx) { DismissState(scope, thresholdPx, heightPx) { latest.value() } }
 }
 
 /** 👁: значок — текущее состояние ответа; нажатие — текущая карточка, удержание — все карточки. */
