@@ -107,7 +107,20 @@ fun LinguaNavHost(nav: NavHostController = rememberNavController(), openPlayerRe
                 )
             }
             composable(Routes.PLAYER) {
-                PlayerScreen(onBack = { nav.popBackStack() }, onOpenVoices = { nav.navigate(Routes.VOICES) })
+                PlayerScreen(
+                    onBack = { nav.popBackStack() },
+                    onOpenVoices = { nav.navigate(Routes.VOICES) },
+                    // Свайп карточки вниз: плеер закрывается, прослушивание продолжается в мини-плеере.
+                    // Прямой возврат к главной (без restoreState: иначе вернулось бы сохранённое состояние с плеером).
+                    onCloseToHome = {
+                        if (!nav.popBackStack(Routes.HOME, inclusive = false)) {
+                            nav.navigate(Routes.HOME) {
+                                popUpTo(nav.graph.findStartDestination().id) { inclusive = true }
+                                launchSingleTop = true
+                            }
+                        }
+                    },
+                )
             }
             composable(Routes.VOICES) {
                 TtsSettingsScreen(onBack = { nav.popBackStack() })

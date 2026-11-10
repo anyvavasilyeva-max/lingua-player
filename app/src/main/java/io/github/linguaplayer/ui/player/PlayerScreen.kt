@@ -38,7 +38,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
@@ -85,7 +88,7 @@ import io.github.linguaplayer.ui.components.appContainer
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PlayerScreen(onBack: () -> Unit, onOpenVoices: () -> Unit) {
+fun PlayerScreen(onBack: () -> Unit, onOpenVoices: () -> Unit, onCloseToHome: () -> Unit = onBack) {
     val c = appContainer()
     val vm: PlayerViewModel = viewModel { PlayerViewModel(c) }
     val st by vm.state.collectAsStateWithLifecycle()
@@ -156,6 +159,7 @@ fun PlayerScreen(onBack: () -> Unit, onOpenVoices: () -> Unit) {
                         targetName = targetName + if (!st.settings.translationEnabled) " · " + stringResource(R.string.player_no_translation) else "",
                         onNext = { if (vm.hasNext(st)) vm.next() },
                         onPrevious = { if (vm.hasPrevious(st)) vm.previous() },
+                        onSwipeDown = onCloseToHome,
                         onSetAllHidden = { hide ->
                             vm.updateSettings { it.copy(hideAnswer = hide) }
                             // Toast не перекрывает кнопки плеера (в отличие от snackbar).
@@ -266,8 +270,12 @@ private fun FlashCard(
     targetName: String,
     onNext: () -> Unit,
     onPrevious: () -> Unit,
+    onSwipeDown: () -> Unit,
     onSetAllHidden: (Boolean) -> Unit,
 ) {
+    // Карточка следует за пальцем при свайпе вниз (визуальный отклик); отпустили раньше порога — возвращается.
+    var dragY by remember(item.entryId) { mutableFloatStateOf(0f) }
+    val offsetY by animateFloatAsState(dragY, label = "cardDragY")
     // Короткое нажатие меняет только эту карточку; на следующей действует общий режим [hideAnswer].
     var override by remember(item.entryId, item.sourceFirst, hideAnswer) { mutableStateOf<Boolean?>(null) }
     val answerHidden = override ?: hideAnswer
@@ -276,14 +284,33 @@ private fun FlashCard(
         shape = RoundedCornerShape(28.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
         modifier = Modifier.fillMaxWidth()
+            .graphicsLayer {
+                translationY = offsetY
+                alpha = 1f - (offsetY / (size.height * 2f)).coerceIn(0f, 0.5f)
+            }
             .pointerInput(item.entryId) {
-                var total = 0f
-                detectHorizontalDragGestures(
-                    onDragStart = { total = 0f },
+                // Влево/вправо — следующая/предыдущая; вниз — закрыть плеер и выйти на главную.
+                // Направление определяется по преобладающей оси движения.
+                var dx = 0f
+                var dy = 0f
+                detectDragGestures(
+                    onDragStart = { dx = 0f; dy = 0f },
+                    onDragCancel = { dragY = 0f },
                     onDragEnd = {
-                        if (total < -swipeThreshold) onNext() else if (total > swipeThreshold) onPrevious()
+                        val horizontal = kotlin.math.abs(dx) > kotlin.math.abs(dy)
+                        when {
+                            horizontal && dx < -swipeThreshold -> onNext()
+                            horizontal && dx > swipeThreshold -> onPrevious()
+                            !horizontal && dy > swipeThreshold -> onSwipeDown()
+                        }
+                        dragY = 0f
                     },
-                ) { _, dx -> total += dx }
+                ) { change, amount ->
+                    change.consume()
+                    dx += amount.x
+                    dy += amount.y
+                    if (kotlin.math.abs(dy) > kotlin.math.abs(dx)) dragY = dy.coerceAtLeast(0f) * 0.6f
+                }
             }
             .clickable { override = !answerHidden },
     ) {

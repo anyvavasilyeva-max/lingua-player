@@ -6,6 +6,8 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
+import androidx.compose.ui.test.swipe
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.swipeRight
@@ -209,5 +211,25 @@ class PlayerFlowTest {
         ui.waitText("Ложка")
         ui.clickDesc("Следующая")
         ui.waitText("Вилка")
+    }
+
+    @Test
+    fun swipeDownClosesPlayerToHomeAndKeepsPlaying() {
+        ui.waitText("Что послушаем?")
+        ui.clickDesc("Слушать")
+        ui.waitText("1 из 3")
+        ui.realWait { c.player.state.value.isPlaying }
+        // Свайп влево по-прежнему листает, а не закрывает.
+        rule.onAllNodesWithText("설거지를 하다", useUnmergedTree = true)[0].performTouchInput { swipeLeft() }
+        ui.waitText("2 из 3")
+        // Свайп пальцем вниз на ~300 dp от слова на карточке.
+        rule.onAllNodesWithText("숟가락", useUnmergedTree = true)[0].performTouchInput {
+            swipe(start = center, end = center + androidx.compose.ui.geometry.Offset(0f, 300.dp.toPx()), durationMillis = 300)
+        }
+        ui.waitText("Что послушаем?") // главная
+        ui.waitText("Корейский → Русский")
+        assertEquals(true, c.player.state.value.isPlaying) // прослушивание продолжается
+        ui.waitText("Библиотека · 2/3") // мини-плеер
+        ui.shot("27_after_swipe_down_home")
     }
 }
