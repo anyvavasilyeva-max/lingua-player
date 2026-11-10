@@ -60,18 +60,27 @@ import io.github.linguaplayer.ui.components.appContainer
 import io.github.linguaplayer.ui.home.PlaylistListItem
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import io.github.linguaplayer.data.repo.displayName
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class PlaylistsViewModel(private val c: AppContainer) : ViewModel() {
-    val playlists = c.playlists.observeAll().map { it }
+    /** Активная языковая пара: показываются только её плейлисты. */
+    val pair = c.activePair.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    val playlists = c.activePair.flatMapLatest { p -> if (p == null) flowOf(emptyList()) else c.playlists.observeAll(p.id) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
-    val pairs = c.languagePairs.observeAll().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-    val tags = c.tags.observeAll().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val tags = c.activePair.flatMapLatest { p -> if (p == null) flowOf(emptyList()) else c.tags.observeUsedInPair(p.id) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     fun create(name: String, kind: PlaylistKind, rules: SmartRules?, onCreated: (Long) -> Unit) = viewModelScope.launch {
-        runCatching { c.playlists.create(name, kind, rules) }.onSuccess(onCreated)
+        val pairId = c.activePair.first()?.id ?: return@launch
+        runCatching { c.playlists.create(name, pairId, kind, rules) }.onSuccess(onCreated)
     }
     fun rename(id: Long, name: String) = viewModelScope.launch { runCatching { c.playlists.rename(id, name) } }
     fun delete(id: Long) = viewModelScope.launch { c.playlists.delete(id) }
@@ -86,7 +95,7 @@ fun PlaylistsScreen(onOpenPlaylist: (Long) -> Unit) {
     val c = appContainer()
     val vm: PlaylistsViewModel = viewModel { PlaylistsViewModel(c) }
     val playlists by vm.playlists.collectAsStateWithLifecycle()
-    val pairs by vm.pairs.collectAsStateWithLifecycle()
+    val pair by vm.pair.collectAsStateWithLifecycle()
     val tags by vm.tags.collectAsStateWithLifecycle()
     var showCreate by remember { mutableStateOf(false) }
     var renaming by remember { mutableStateOf<PlaylistEntity?>(null) }
@@ -155,7 +164,7 @@ fun PlaylistsScreen(onOpenPlaylist: (Long) -> Unit) {
     if (showCreate) {
         PlaylistEditorDialog(
             title = stringResource(R.string.playlist_new),
-            pairs = pairs,
+            pairName = pair?.displayName().orEmpty(),
             tags = tags,
             onDismiss = { showCreate = false },
             onConfirm = { name, kind, rules ->

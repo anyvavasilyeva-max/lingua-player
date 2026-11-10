@@ -15,6 +15,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import io.github.linguaplayer.data.db.EntryEntity
 import io.github.linguaplayer.player.AndroidTtsEngine
@@ -53,6 +55,12 @@ class AppContainer(private val context: Context) {
     val player: PlayerEngine by lazy {
         PlayerEngine(mainScope, playerSpeechOverride ?: speech).also { p ->
             mainScope.launch { settings.playback.collect { p.updateSettings(it) } }
+            // Библиотеки пар не пересекаются: при переключении пары очередь другой пары сбрасывается.
+            mainScope.launch {
+                activePair.map { it?.id }.distinctUntilChanged().collect { id ->
+                    if (p.state.value.queue.any { it.pairId != id }) p.clear()
+                }
+            }
             if (playerSpeechOverride == null) {
                 mainScope.launch { settings.ttsEngine.collect { speech.setEnginePackage(it) } }
             }

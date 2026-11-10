@@ -144,8 +144,8 @@ class RepositoryTest {
     fun entryCanBeInSeveralPlaylistsAndDeletingPlaylistKeepsEntries() = runTest {
         val e1 = add("포크", "Вилка")
         val e2 = add("숟가락", "Ложка")
-        val p1 = t.playlists.create("Кухня")
-        val p2 = t.playlists.create("Повторить")
+        val p1 = t.playlists.create("Кухня", pairId)
+        val p2 = t.playlists.create("Повторить", pairId)
         t.playlists.addEntries(p1, listOf(e1, e2))
         t.playlists.addEntries(p2, listOf(e1))
         assertEquals(setOf(p1, p2), t.entries.getDetails(e1)!!.playlistIds)
@@ -158,7 +158,7 @@ class RepositoryTest {
     @Test
     fun manualOrderInPlaylist() = runTest {
         val ids = listOf(add("가", "a"), add("나", "b"), add("다", "c"))
-        val p = t.playlists.create("Порядок")
+        val p = t.playlists.create("Порядок", pairId)
         t.playlists.addEntries(p, ids.reversed())
         val filter = EntryFilter(playlistId = p, sort = EntrySort.PLAYLIST_ORDER)
         assertEquals(listOf("다", "나", "가"), sources(filter))
@@ -172,7 +172,7 @@ class RepositoryTest {
     @Test
     fun deletingEntryRemovesItFromPlaylists() = runTest {
         val e = add("포크", "Вилка")
-        val p = t.playlists.create("Кухня")
+        val p = t.playlists.create("Кухня", pairId)
         t.playlists.addEntries(p, listOf(e))
         t.entries.delete(listOf(e))
         assertTrue(sources(EntryFilter(playlistId = p)).isEmpty())
@@ -188,8 +188,9 @@ class RepositoryTest {
 
         val id = t.playlists.create(
             "TOPIK 3급 — фразы",
+            pairId,
             PlaylistKind.SMART,
-            SmartRules(pairId, TypeFilter.PHRASES, setOf(topik), TagMatchMode.ANY),
+            SmartRules(TypeFilter.PHRASES, setOf(topik), TagMatchMode.ANY),
         )
         val content = t.playlists.observeEntries(id).first().map { it.entry.source }
         assertEquals(listOf("설거지를 하다"), content)
@@ -234,17 +235,70 @@ class RepositoryTest {
     fun coverFilesAreDeletedWhenReplacedOrPlaylistDeleted() = runTest {
         val deleted = mutableListOf<String>()
         val repo = io.github.linguaplayer.data.repo.PlaylistRepository(t.db, t.entries, t.clock) { deleted += it }
-        val id = repo.create("Обложка")
+        val id = repo.create("Обложка", pairId)
         repo.setCover(id, "/covers/a.jpg")
         assertEquals("/covers/a.jpg", repo.get(id)!!.coverPath)
         repo.setCover(id, "/covers/b.jpg")
         assertEquals(listOf("/covers/a.jpg"), deleted)
         repo.delete(id)
         assertEquals(listOf("/covers/a.jpg", "/covers/b.jpg"), deleted)
-        val id2 = repo.create("Без обложки")
+        val id2 = repo.create("Без обложки", pairId)
         repo.setCover(id2, "/covers/c.jpg")
         repo.setCover(id2, null)
         assertEquals("/covers/c.jpg", deleted.last())
         org.junit.Assert.assertNull(repo.get(id2)!!.coverPath)
+    }
+
+    @Test
+    fun languagePairsDoNotShareLibrariesOrPlaylists() = runTest {
+        val ko = pairId
+        val en = t.pairs.add("en-US", "ru-RU")
+        val shared = t.tags.create("кухня").id
+        val fork = add("포크", "Вилка", tags = setOf(shared))
+        val enFork = t.entries.save(EntryDraft(pairId = en, source = "fork", translation = "Вилка", type = EntryType.WORD, tagIds = setOf(shared)))
+        t.entries.save(EntryDraft(pairId = en, source = "to wash dishes", translation = "Мыть посуду", type = EntryType.PHRASE, tagIds = emptySet()))
+
+        val koList = t.playlists.create("Корейская кухня", ko)
+        val enList = t.playlists.create("English kitchen", en)
+        val enSmart = t.playlists.create("EN кухня", en, PlaylistKind.SMART, SmartRules(TypeFilter.ALL, setOf(shared), TagMatchMode.ANY))
+
+        // Списки плейлистов — только своей пары.
+        assertEquals(listOf("Корейская кухня"), t.playlists.observeAll(ko).first().map { it.playlist.name })
+        assertEquals(setOf("English kitchen", "EN кухня"), t.playlists.observeAll(en).first().map { it.playlist.name }.toSet())
+
+        // Запись другой пары в плейлист не добавляется.
+        t.playlists.addEntries(koList, listOf(fork, enFork))
+        assertEquals(listOf("포크"), t.playlists.observeEntries(koList).first().map { it.entry.source })
+        assertEquals(1, t.playlists.observeAll(ko).first().single().entryCount)
+
+        // Редактор записи не может привязать её к плейлисту чужой пары.
+        t.entries.save(EntryDraft(enFork, en, "fork", "Вилка", EntryType.WORD, setOf(shared), playlistIds = setOf(koList, enList)))
+        assertEquals(setOf(enList), t.entries.getDetails(enFork)!!.playlistIds)
+
+        // Умный плейлист с общим тегом берёт записи только своей пары.
+        assertEquals(listOf("fork"), t.playlists.observeEntries(enSmart).first().map { it.entry.source })
+
+        // Библиотека пары.
+        assertEquals(listOf("포크"), t.entries.getEntries(EntryFilter(pairId = ko)).map { it.source })
+        assertEquals(2, t.entries.getEntries(EntryFilter(pairId = en)).size)
+
+        // Фильтры тегов: в паре видны только используемые в ней (+ системный «Не помню»).
+        val onlyEnTag = t.tags.create("only-en").id
+        t.entries.addTags(listOf(enFork), listOf(onlyEnTag))
+        val koTags = t.tags.observeUsedInPair(ko).first().map { it.name }
+        assertEquals(listOf("Не помню", "кухня"), koTags)
+        assertTrue("only-en" in t.tags.observeUsedInPair(en).first().map { it.name })
+    }
+
+    @Test
+    fun pairWithPlaylistsCannotBeDeleted() = runTest {
+        val en = t.pairs.add("en-US", "ru-RU")
+        t.playlists.create("Пустой", en)
+        try {
+            t.pairs.delete(en)
+            fail("expected exception")
+        } catch (e: UserFacingException) {
+            assertEquals(UserFacingException.Reason.PAIR_IN_USE, e.reason)
+        }
     }
 }

@@ -5,6 +5,8 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
+import androidx.compose.ui.test.longClick
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.swipeRight
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.test.core.app.ActivityScenario
@@ -160,5 +162,47 @@ class PlayerFlowTest {
         // При перемешивании текущая карточка осталась текущей.
         assertEquals("설거지를 하다", c.player.state.value.current!!.source)
         ui.shot("24_player_controls")
+    }
+
+    @Test
+    fun eyeTapAffectsCurrentCardHoldAffectsAll() {
+        ui.waitText("Что послушаем?")
+        ui.clickDesc("Слушать")
+        ui.waitText("1 из 3")
+        ui.clickDesc("Пауза")
+        ui.realWait { !c.player.state.value.isPlaying }
+
+        // «Глазик» есть всегда; по умолчанию ответ открыт.
+        ui.waitText("Мыть посуду")
+        // Нажатие — скрыть только эту карточку.
+        ui.clickDesc("Скрыть ответ")
+        ui.waitText("• • •")
+        ui.clickDesc("Следующая")
+        ui.waitText("2 из 3")
+        ui.waitText("Ложка") // на следующей карточке ответ снова открыт (общий режим не менялся)
+        assertEquals(false, runBlocking { c.settings.playback.first().hideAnswer })
+
+        // Удержание — скрыть на всех карточках; режим запоминается.
+        rule.onAllNodesWithContentDescription("Скрыть ответ")[0].performTouchInput { longClick() }
+        ui.realWait { runBlocking { c.settings.playback.first().hideAnswer } }
+        ui.waitText("• • •")
+        ui.clickDesc("Следующая")
+        ui.waitText("3 из 3")
+        ui.waitText("• • •")
+        ui.shot("25_eye_all_hidden")
+
+        // Нажатие на скрытой — открыть только её; общий режим остаётся «скрыто».
+        ui.clickDesc("Показать ответ")
+        ui.waitText("Вилка")
+        ui.clickDesc("Предыдущая")
+        ui.waitText("2 из 3")
+        ui.waitText("• • •")
+
+        // Удержание на скрытой — открыть на всех.
+        rule.onAllNodesWithContentDescription("Показать ответ")[0].performTouchInput { longClick() }
+        ui.realWait { runBlocking { !c.settings.playback.first().hideAnswer } }
+        ui.waitText("Ложка")
+        ui.clickDesc("Следующая")
+        ui.waitText("Вилка")
     }
 }

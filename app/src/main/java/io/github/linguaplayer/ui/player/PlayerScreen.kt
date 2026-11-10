@@ -30,7 +30,14 @@ import androidx.compose.material.icons.outlined.ShuffleOn
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.IconToggleButton
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.input.pointer.pointerInput
@@ -84,6 +91,9 @@ fun PlayerScreen(onBack: () -> Unit, onOpenVoices: () -> Unit) {
     val st by vm.state.collectAsStateWithLifecycle()
     val dontRemember by vm.dontRemember.collectAsStateWithLifecycle()
     var showSettings by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val hiddenAllMsg = stringResource(R.string.player_all_hidden)
+    val shownAllMsg = stringResource(R.string.player_all_shown)
     val item = st.current
     val sourceName = item?.let { languageDisplayName(it.sourceLang) } ?: stringResource(R.string.ps_studied_language)
     val targetName = item?.let { languageDisplayName(it.targetLang) } ?: stringResource(R.string.ps_translation_language)
@@ -146,6 +156,11 @@ fun PlayerScreen(onBack: () -> Unit, onOpenVoices: () -> Unit) {
                         targetName = targetName + if (!st.settings.translationEnabled) " · " + stringResource(R.string.player_no_translation) else "",
                         onNext = { if (vm.hasNext(st)) vm.next() },
                         onPrevious = { if (vm.hasPrevious(st)) vm.previous() },
+                        onSetAllHidden = { hide ->
+                            vm.updateSettings { it.copy(hideAnswer = hide) }
+                            // Toast не перекрывает кнопки плеера (в отличие от snackbar).
+                            Toast.makeText(context, if (hide) hiddenAllMsg else shownAllMsg, Toast.LENGTH_SHORT).show()
+                        },
                     )
                 }
                 if (!st.isPlaying) {
@@ -252,9 +267,11 @@ private fun FlashCard(
     targetName: String,
     onNext: () -> Unit,
     onPrevious: () -> Unit,
+    onSetAllHidden: (Boolean) -> Unit,
 ) {
-    var revealed by remember(item.entryId, item.sourceFirst, hideAnswer) { mutableStateOf(false) }
-    val answerHidden = hideAnswer && !revealed
+    // Короткое нажатие меняет только эту карточку; на следующей действует общий режим [hideAnswer].
+    var override by remember(item.entryId, item.sourceFirst, hideAnswer) { mutableStateOf<Boolean?>(null) }
+    val answerHidden = override ?: hideAnswer
     val swipeThreshold = with(LocalDensity.current) { 80.dp.toPx() }
     Card(
         shape = RoundedCornerShape(28.dp),
@@ -269,7 +286,7 @@ private fun FlashCard(
                     },
                 ) { _, dx -> total += dx }
             }
-            .clickable(enabled = hideAnswer) { revealed = !revealed },
+            .clickable { override = !answerHidden },
     ) {
         Box(Modifier.fillMaxWidth()) {
             Column(
@@ -295,15 +312,36 @@ private fun FlashCard(
                     SpokenText(second.first, second.second, speaking == second.third, big = second.third == Part.SOURCE)
                 }
             }
-            if (hideAnswer) {
-                IconButton(onClick = { revealed = !revealed }, modifier = Modifier.align(Alignment.TopEnd).padding(4.dp)) {
-                    Icon(
-                        if (revealed) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
-                        stringResource(if (revealed) R.string.player_hide_answer else R.string.player_show_answer),
-                    )
-                }
-            }
+            EyeButton(
+                hidden = answerHidden,
+                onTap = { override = !answerHidden },
+                // Удержание: «скрыть» → скрыть на всех карточках, «показать» → открыть на всех.
+                onHold = { onSetAllHidden(!answerHidden) },
+                modifier = Modifier.align(Alignment.TopEnd).padding(4.dp),
+            )
         }
+    }
+}
+
+/** 👁: нажатие — текущая карточка, удержание — все карточки. */
+@Composable
+private fun EyeButton(hidden: Boolean, onTap: () -> Unit, onHold: () -> Unit, modifier: Modifier = Modifier) {
+    val description = stringResource(if (hidden) R.string.player_show_answer else R.string.player_hide_answer)
+    val holdLabel = stringResource(if (hidden) R.string.player_show_all else R.string.player_hide_all)
+    Box(
+        modifier
+            .size(48.dp)
+            .clip(CircleShape)
+            .combinedClickable(
+                onClickLabel = description,
+                onLongClickLabel = holdLabel,
+                onLongClick = onHold,
+                onClick = onTap,
+            )
+            .semantics { contentDescription = description },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(if (hidden) Icons.Outlined.Visibility else Icons.Outlined.VisibilityOff, null)
     }
 }
 

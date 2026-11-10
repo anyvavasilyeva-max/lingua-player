@@ -80,7 +80,7 @@ class ImportRepositoryTest {
     fun reimportUpdateMergesTagsAndKeepsPlaylists() = runTest {
         importer.import(csv("source,translation,type,tags\n포크,Вилка,word,кухня\n"), opts(DuplicatePolicy.SKIP))
         val entry = t.entries.getEntries(EntryFilter()).single()
-        val playlist = t.playlists.create("Кухня")
+        val playlist = t.playlists.create("Кухня", pairId)
         t.playlists.addEntries(playlist, listOf(entry.id))
 
         val r = importer.import(csv("source,translation,type,tags\n포크,\"Вилка; вилочка\",phrase,быт;КУХНЯ\n"), opts(DuplicatePolicy.UPDATE))

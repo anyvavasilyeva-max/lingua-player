@@ -5,7 +5,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class SpeechPlannerTest {
-    private val item = QueueItem(1, "포크", "Вилка", io.github.linguaplayer.data.db.EntryType.WORD, "ko-KR", "ru-RU", sourceFirst = true)
+    private val item = QueueItem(1, 1, "포크", "Вилка", io.github.linguaplayer.data.db.EntryType.WORD, "ko-KR", "ru-RU", sourceFirst = true)
 
     private fun describe(steps: List<Step>, s: PlaybackSettings) = steps.map {
         when (it) {

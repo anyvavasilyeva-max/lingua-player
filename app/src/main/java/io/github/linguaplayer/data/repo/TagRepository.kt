@@ -14,6 +14,9 @@ class TagRepository(
 
     fun observeAll(): Flow<List<TagEntity>> = dao.observeAll()
 
+    /** Теги, используемые в паре (и системные). */
+    fun observeUsedInPair(pairId: Long): Flow<List<TagEntity>> = dao.observeUsedInPair(pairId)
+
     fun observeWithCounts(): Flow<List<TagWithCount>> = dao.observeAllWithCounts()
 
     suspend fun dontRememberTag(): TagEntity? = dao.getBySystemKey(TagEntity.SYSTEM_DONT_REMEMBER)

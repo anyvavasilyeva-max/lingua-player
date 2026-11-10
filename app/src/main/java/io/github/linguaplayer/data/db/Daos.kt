@@ -60,6 +60,10 @@ interface EntryDao {
     @Query("SELECT * FROM entries WHERE pair_id = :pairId AND source_key = :sourceKey ORDER BY id")
     suspend fun findBySourceKey(pairId: Long, sourceKey: String): List<EntryEntity>
 
+    /** Из [ids] оставляет только записи пары [pairId]. */
+    @Query("SELECT id FROM entries WHERE id IN (:ids) AND pair_id = :pairId")
+    suspend fun idsInPair(ids: List<Long>, pairId: Long): List<Long>
+
     @Query("SELECT * FROM entries WHERE id IN (:ids)")
     suspend fun getByIds(ids: List<Long>): List<EntryEntity>
 
@@ -125,6 +129,14 @@ interface TagDao {
     )
     fun observeAllWithCounts(): Flow<List<TagWithCount>>
 
+    /** Теги, которые используются в паре (и системные) — для фильтров библиотеки и умных плейлистов. */
+    @Query(
+        "SELECT * FROM tags t WHERE t.system_key IS NOT NULL OR EXISTS (" +
+            "SELECT 1 FROM entry_tags et JOIN entries e ON e.id = et.entry_id " +
+            "WHERE et.tag_id = t.id AND e.pair_id = :pairId) ORDER BY (t.system_key IS NULL), t.name_key",
+    )
+    fun observeUsedInPair(pairId: Long): Flow<List<TagEntity>>
+
     @Query("SELECT * FROM tags")
     suspend fun getAll(): List<TagEntity>
 
@@ -157,19 +169,25 @@ data class PlaylistWithCount(
 @Dao
 interface PlaylistDao {
     @Query(
-        "SELECT p.*, (SELECT COUNT(*) FROM playlist_entries pe WHERE pe.playlist_id = p.id) AS entry_count " +
-            "FROM playlists p ORDER BY p.name COLLATE NOCASE",
+        "SELECT p.*, (SELECT COUNT(*) FROM playlist_entries pe JOIN entries e ON e.id = pe.entry_id " +
+            "WHERE pe.playlist_id = p.id AND e.pair_id = p.pair_id) AS entry_count " +
+            "FROM playlists p WHERE p.pair_id = :pairId ORDER BY p.name COLLATE NOCASE",
     )
-    fun observeAllWithCounts(): Flow<List<PlaylistWithCount>>
+    fun observeAllWithCounts(pairId: Long): Flow<List<PlaylistWithCount>>
 
     @Query(
-        "SELECT p.*, (SELECT COUNT(*) FROM playlist_entries pe WHERE pe.playlist_id = p.id) AS entry_count " +
-            "FROM playlists p WHERE p.last_opened_at IS NOT NULL ORDER BY p.last_opened_at DESC LIMIT :limit",
+        "SELECT p.*, (SELECT COUNT(*) FROM playlist_entries pe JOIN entries e ON e.id = pe.entry_id " +
+            "WHERE pe.playlist_id = p.id AND e.pair_id = p.pair_id) AS entry_count " +
+            "FROM playlists p WHERE p.pair_id = :pairId AND p.last_opened_at IS NOT NULL " +
+            "ORDER BY p.last_opened_at DESC LIMIT :limit",
     )
-    fun observeRecent(limit: Int): Flow<List<PlaylistWithCount>>
+    fun observeRecent(pairId: Long, limit: Int): Flow<List<PlaylistWithCount>>
 
-    @Query("SELECT * FROM playlists WHERE kind = 'normal' ORDER BY name COLLATE NOCASE")
-    suspend fun getNormalPlaylists(): List<PlaylistEntity>
+    @Query("SELECT * FROM playlists WHERE kind = 'normal' AND pair_id = :pairId ORDER BY name COLLATE NOCASE")
+    suspend fun getNormalPlaylists(pairId: Long): List<PlaylistEntity>
+
+    @Query("SELECT COUNT(*) FROM playlists WHERE pair_id = :pairId")
+    suspend fun countForPair(pairId: Long): Int
 
     @Query("SELECT * FROM playlists WHERE id = :id")
     suspend fun getById(id: Long): PlaylistEntity?

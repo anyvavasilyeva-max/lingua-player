@@ -51,7 +51,7 @@ class DesignTest {
             val pair = c.languagePairs.getAll().first().id
             val e = c.entries.save(EntryDraft(pairId = pair, source = "포크", translation = "Вилка", type = EntryType.WORD, tagIds = emptySet()))
             val names = listOf("Существительные", "Глаголы", "Прилагательные", "Числа", "20 фраз", "Повторить")
-            val ids = names.map { c.playlists.create(it) }
+            val ids = names.map { c.playlists.create(it, pair) }
             ids.forEach { c.playlists.addEntries(it, listOf(e)); c.playlists.markOpened(it) }
             // Своя обложка у первого плейлиста — картинка-градиент.
             val bmp = Bitmap.createBitmap(400, 400, Bitmap.Config.ARGB_8888)

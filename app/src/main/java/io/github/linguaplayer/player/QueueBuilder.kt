@@ -9,6 +9,8 @@ import kotlin.random.Random
 /** Один элемент очереди: запись + языки + выбранное направление. */
 data class QueueItem(
     val entryId: Long,
+    /** Языковая пара записи — при переключении пары чужая очередь сбрасывается. */
+    val pairId: Long,
     val source: String,
     val translation: String,
     val type: EntryType,
@@ -60,6 +62,7 @@ object QueueBuilder {
             val pair = source.pairs.getValue(e.pairId)
             QueueItem(
                 entryId = e.id,
+                pairId = e.pairId,
                 source = e.source,
                 translation = e.translation,
                 type = e.type,

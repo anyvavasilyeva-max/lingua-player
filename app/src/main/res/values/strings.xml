@@ -31,7 +31,7 @@
     <string name="error_system_tag">Системный тег нельзя удалить</string>
     <string name="error_pair_exists">Такая языковая пара уже есть</string>
     <string name="error_pair_invalid">Неверный код языка (нужен формат BCP 47, например ko-KR)</string>
-    <string name="error_pair_in_use">В этой языковой паре есть записи — её нельзя удалить</string>
+    <string name="error_pair_in_use">В этой языковой паре есть записи или плейлисты — её нельзя удалить</string>
     <string name="error_not_found">Запись не найдена</string>
     <string name="error_unknown">Ошибка: %1$s</string>
 
@@ -194,7 +194,6 @@
     <string name="playlist_kind_normal_desc">Записи добавляются вручную</string>
     <string name="playlist_kind_smart_desc">Содержимое по тегам и типу — обновляется само</string>
     <string name="smart_rules">Условия умного плейлиста</string>
-    <string name="smart_pair_any">Любая языковая пара</string>
     <string name="smart_tags_none">Без условия по тегам</string>
     <string name="smart_edit">Изменить условия</string>
 
@@ -276,7 +275,7 @@
     <!-- Плеер: карточки и повторы -->
     <string name="player_show_answer">Показать ответ</string>
     <string name="player_hide_answer">Скрыть ответ</string>
-    <string name="player_hidden_hint">Нажмите на карточку или 👁, чтобы показать</string>
+    <string name="player_hidden_hint">Нажмите на карточку или 👁. Удерживайте 👁 — для всех карточек</string>
     <string name="player_shuffle">Перемешать</string>
     <string name="player_repeat_off">Повтор выключен</string>
     <string name="player_repeat_all">Зациклить список</string>
@@ -287,7 +286,7 @@
     <string name="ps_slow_repeat">Повтор с замедлением</string>
     <string name="ps_slow_repeat_desc">Второй раз — на одну ступень медленнее. Например, 2 раза: 1× · 0,75×; 3 раза: 1× · 0,75× · 1×</string>
     <string name="ps_hide_answer">Скрывать ответ на карточке</string>
-    <string name="ps_hide_answer_desc">Перевод (или слово — при обратном направлении) открывается кнопкой 👁. Удобно листать как карточки</string>
+    <string name="ps_hide_answer_desc">Перевод (или слово — при обратном направлении) скрыт на всех карточках. Нажатие на 👁 — только текущая карточка, удержание 👁 — скрыть/открыть на всех</string>
 
     <!-- Оформление -->
     <string name="theme_title">Цвет оформления</string>
@@ -300,4 +299,9 @@
     <string name="cover_change">Выбрать обложку</string>
     <string name="cover_remove">Убрать обложку</string>
     <string name="cover_failed">Не удалось открыть изображение</string>
+    <string name="home_switch_pair">Сменить языковую пару</string>
+    <string name="player_show_all">Показать ответ на всех карточках</string>
+    <string name="player_hide_all">Скрыть ответ на всех карточках</string>
+    <string name="player_all_hidden">Ответ скрыт на всех карточках</string>
+    <string name="player_all_shown">Ответ открыт на всех карточках</string>
 </resources>

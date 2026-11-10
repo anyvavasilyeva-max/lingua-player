@@ -10,6 +10,7 @@ class LanguagePairRepository(
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
     private val dao = db.languagePairDao()
+    private val playlistDao = db.playlistDao()
 
     fun observeAll(): Flow<List<LanguagePairEntity>> = dao.observeAll()
 
@@ -25,9 +26,11 @@ class LanguagePairRepository(
         return dao.insert(LanguagePairEntity(sourceLang = source, targetLang = target, createdAt = clock()))
     }
 
-    /** Пару можно удалить, только если в ней нет записей. */
+    /** Пару можно удалить, только если в ней нет записей и плейлистов. */
     suspend fun delete(id: Long) {
-        if (dao.countEntries(id) > 0) throw UserFacingException(UserFacingException.Reason.PAIR_IN_USE)
+        if (dao.countEntries(id) > 0 || playlistDao.countForPair(id) > 0) {
+            throw UserFacingException(UserFacingException.Reason.PAIR_IN_USE)
+        }
         dao.delete(id)
     }
 

@@ -29,14 +29,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import io.github.linguaplayer.R
-import io.github.linguaplayer.data.db.LanguagePairEntity
 import io.github.linguaplayer.data.db.PlaylistKind
 import io.github.linguaplayer.data.db.TagEntity
 import io.github.linguaplayer.data.db.TagMatchMode
 import io.github.linguaplayer.data.db.TypeFilter
 import io.github.linguaplayer.data.repo.SmartRules
-import io.github.linguaplayer.data.repo.displayName
-import io.github.linguaplayer.ui.components.DropdownField
 
 /**
  * Создание плейлиста (обычного или умного) и редактирование условий умного плейлиста.
@@ -46,7 +43,8 @@ import io.github.linguaplayer.ui.components.DropdownField
 @Composable
 fun PlaylistEditorDialog(
     title: String,
-    pairs: List<LanguagePairEntity>,
+    /** Название языковой пары плейлиста (только для показа). */
+    pairName: String,
     tags: List<TagEntity>,
     initialName: String = "",
     initialKind: PlaylistKind = PlaylistKind.NORMAL,
@@ -57,7 +55,6 @@ fun PlaylistEditorDialog(
 ) {
     var name by remember { mutableStateOf(initialName) }
     var kind by remember { mutableStateOf(initialKind) }
-    var pairId by remember { mutableStateOf(initialRules?.pairId ?: pairs.firstOrNull()?.id) }
     var type by remember { mutableStateOf(initialRules?.type ?: TypeFilter.ALL) }
     var tagIds by remember { mutableStateOf(initialRules?.tagIds ?: emptySet()) }
     var mode by remember { mutableStateOf(initialRules?.tagMode ?: TagMatchMode.ANY) }
@@ -85,12 +82,10 @@ fun PlaylistEditorDialog(
                 }
                 if (kind == PlaylistKind.SMART) {
                     Text(stringResource(R.string.smart_rules), style = MaterialTheme.typography.titleSmall)
-                    val options = listOf(stringResource(R.string.smart_pair_any)) + pairs.map { it.displayName() }
-                    DropdownField(
-                        label = stringResource(R.string.import_pair),
-                        options = options,
-                        selectedIndex = pairs.indexOfFirst { it.id == pairId } + 1,
-                        onSelect = { pairId = if (it == 0) null else pairs[it - 1].id },
+                    Text(
+                        stringResource(R.string.entry_pair, pairName),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         listOf(
@@ -120,7 +115,7 @@ fun PlaylistEditorDialog(
         confirmButton = {
             TextButton(
                 onClick = {
-                    val rules = if (kind == PlaylistKind.SMART) SmartRules(pairId, type, tagIds, mode) else null
+                    val rules = if (kind == PlaylistKind.SMART) SmartRules(type, tagIds, mode) else null
                     onConfirm(name, kind, rules)
                 },
                 enabled = name.isNotBlank(),

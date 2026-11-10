@@ -73,6 +73,8 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -96,7 +98,12 @@ class LibraryViewModel(private val c: AppContainer) : ViewModel() {
     val selected = MutableStateFlow<Set<Long>>(emptySet())
     val message = MutableStateFlow<LibraryMessage?>(null)
 
+    /** Все теги — для назначения записям. */
     val tags = c.tags.observeAll().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** Теги, используемые в активной паре, — для фильтров (теги другой пары не показываются). */
+    val pairTags = c.activePair.flatMapLatest { p -> if (p == null) flowOf(emptyList()) else c.tags.observeUsedInPair(p.id) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     /** null — данные ещё загружаются. */
     val entries = combine(c.activePair, filter.debounce(150)) { pair, f -> pair to f }
@@ -151,7 +158,7 @@ class LibraryViewModel(private val c: AppContainer) : ViewModel() {
         runCatching { c.tags.getOrCreate(name) }.getOrNull()?.let { onCreated(it.id) }
     }
 
-    suspend fun normalPlaylists() = c.playlists.normalPlaylists()
+    suspend fun normalPlaylists() = c.activePair.first()?.let { c.playlists.normalPlaylists(it.id) }.orEmpty()
 
     /** Слушать найденные записи (или только выбранные, если есть выбор). */
     fun play(title: String, onStarted: () -> Unit) = viewModelScope.launch {
@@ -183,6 +190,7 @@ fun LibraryScreen(
     val filter by vm.filter.collectAsStateWithLifecycle()
     val entries by vm.entries.collectAsStateWithLifecycle()
     val tags by vm.tags.collectAsStateWithLifecycle()
+    val pairTags by vm.pairTags.collectAsStateWithLifecycle()
     val selected by vm.selected.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     val selecting = selected.isNotEmpty()
@@ -284,7 +292,7 @@ fun LibraryScreen(
                 },
                 singleLine = true,
             )
-            FilterBar(filter, tags, vm)
+            FilterBar(filter, pairTags, vm)
             HorizontalDivider()
             val list = entries
             when {
@@ -310,7 +318,7 @@ fun LibraryScreen(
         )
         LibraryDialog.REMOVE_TAGS -> TagPickerDialog(
             title = stringResource(R.string.selection_remove_tags),
-            tags = tags,
+            tags = pairTags,
             onDismiss = { dialog = null },
             onConfirm = { vm.removeTags(it); dialog = null },
         )

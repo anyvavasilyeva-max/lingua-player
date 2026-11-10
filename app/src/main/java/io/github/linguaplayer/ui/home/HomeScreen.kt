@@ -27,6 +27,17 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.RadioButton
+import androidx.compose.material.icons.outlined.ArrowDropDown
+import androidx.compose.material.icons.outlined.Translate
+import androidx.compose.foundation.layout.Box
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import kotlinx.coroutines.flow.map
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.MaterialTheme
@@ -66,6 +77,10 @@ data class HomeState(
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class HomeViewModel(private val c: AppContainer) : ViewModel() {
+    val pairs = c.languagePairs.observeAll().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val activePairId = c.activePair.map { it?.id }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    fun selectPair(id: Long) = viewModelScope.launch { c.settings.setActivePair(id) }
+
     fun playLibrary(title: String, onStarted: () -> Unit) = viewModelScope.launch {
         val pair = c.activePair.first() ?: return@launch
         val list = c.entries.getEntries(io.github.linguaplayer.data.db.EntryFilter(pairId = pair.id))
@@ -76,7 +91,8 @@ class HomeViewModel(private val c: AppContainer) : ViewModel() {
 
     val state = c.activePair.flatMapLatest { pair ->
         val count = if (pair == null) flowOf(0) else c.entries.observeCountForPair(pair.id)
-        combine(count, c.playlists.observeRecent(5)) { n, recent ->
+        val recent = if (pair == null) flowOf(emptyList()) else c.playlists.observeRecent(pair.id, 5)
+        combine(count, recent) { n, recent ->
             HomeState(pair?.displayName().orEmpty(), n, recent)
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeState())
@@ -98,7 +114,7 @@ fun HomeScreen(
     LazyColumn(Modifier.fillMaxSize().statusBarsPadding(), contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp)) {
         item {
             Text(stringResource(R.string.home_greeting), style = MaterialTheme.typography.headlineMedium)
-            Text(state.pairName, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            PairSwitcher(vm, state.pairName)
             Spacer(Modifier.height(16.dp))
             Card(
                 onClick = onOpenLibrary,
@@ -178,4 +194,29 @@ fun PlaylistListItem(p: PlaylistWithCount, modifier: Modifier = Modifier, traili
         },
         trailingContent = trailing,
     )
+}
+
+/** Активная языковая пара; при нескольких парах — меню для быстрого переключения. */
+@Composable
+private fun PairSwitcher(vm: HomeViewModel, pairName: String) {
+    val pairs by vm.pairs.collectAsStateWithLifecycle()
+    val activeId by vm.activePairId.collectAsStateWithLifecycle()
+    var open by remember { mutableStateOf(false) }
+    Box {
+        AssistChip(
+            onClick = { if (pairs.size > 1) open = true },
+            label = { Text(pairName) },
+            leadingIcon = { Icon(Icons.Outlined.Translate, null, Modifier.size(18.dp)) },
+            trailingIcon = if (pairs.size > 1) { { Icon(Icons.Outlined.ArrowDropDown, stringResource(R.string.home_switch_pair)) } } else null,
+        )
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            pairs.forEach { p ->
+                DropdownMenuItem(
+                    text = { Text(p.displayName()) },
+                    leadingIcon = { RadioButton(selected = p.id == activeId, onClick = null) },
+                    onClick = { open = false; vm.selectPair(p.id) },
+                )
+            }
+        }
+    }
 }

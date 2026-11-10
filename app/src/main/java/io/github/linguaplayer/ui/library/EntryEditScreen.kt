@@ -85,8 +85,10 @@ class EntryEditViewModel(private val c: AppContainer, entryId: Long) : ViewModel
 
     init {
         viewModelScope.launch {
-            val playlists = c.playlists.normalPlaylists()
             val details = if (entryId != 0L) c.entries.getDetails(entryId) else null
+            // Только плейлисты пары этой записи (для новой записи — активной пары).
+            val pairId = details?.entry?.pairId ?: c.activePair.first()?.id
+            val playlists = pairId?.let { c.playlists.normalPlaylists(it) }.orEmpty()
             if (details != null) {
                 state.value = EntryEditState(
                     loaded = true,

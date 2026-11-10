@@ -54,8 +54,13 @@ import io.github.linguaplayer.ui.components.EntryRow
 import io.github.linguaplayer.ui.components.appContainer
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import io.github.linguaplayer.data.repo.displayName
 import kotlinx.coroutines.launch
 
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class PlaylistDetailViewModel(private val c: AppContainer, private val id: Long) : ViewModel() {
     val playlist = c.playlists.observe(id).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
     val entries = c.playlists.observeEntries(id).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
@@ -64,8 +69,11 @@ class PlaylistDetailViewModel(private val c: AppContainer, private val id: Long)
         viewModelScope.launch { c.playlists.markOpened(id) }
     }
 
-    val pairs = c.languagePairs.observeAll().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-    val tags = c.tags.observeAll().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    /** Название пары плейлиста и теги, используемые в этой паре (для условий умного плейлиста). */
+    val pairName = playlist.map { p -> p?.pairId?.let { c.languagePairs.get(it)?.displayName() }.orEmpty() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
+    val tags = playlist.flatMapLatest { p -> p?.pairId?.let { c.tags.observeUsedInPair(it) } ?: flowOf(emptyList()) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     suspend fun smartTagIds() = c.playlists.smartTagIds(id)
 
@@ -105,7 +113,7 @@ fun PlaylistDetailScreen(playlistId: Long, onBack: () -> Unit, onOpenEntry: (Lon
     val vm: PlaylistDetailViewModel = viewModel(key = "playlist-$playlistId") { PlaylistDetailViewModel(c, playlistId) }
     val playlist by vm.playlist.collectAsStateWithLifecycle()
     val entries by vm.entries.collectAsStateWithLifecycle()
-    val pairs by vm.pairs.collectAsStateWithLifecycle()
+    val pairName by vm.pairName.collectAsStateWithLifecycle()
     val tags by vm.tags.collectAsStateWithLifecycle()
     var editRules by remember { mutableStateOf<SmartRules?>(null) }
     var menuOpen by remember { mutableStateOf(false) }
@@ -139,7 +147,7 @@ fun PlaylistDetailScreen(playlistId: Long, onBack: () -> Unit, onOpenEntry: (Lon
                     val p = playlist
                     if (p != null && p.kind == PlaylistKind.SMART) {
                         IconButton(onClick = {
-                            scope.launch { editRules = SmartRules(p.pairId, p.smartType, vm.smartTagIds(), p.smartTagMode) }
+                            scope.launch { editRules = SmartRules(p.smartType, vm.smartTagIds(), p.smartTagMode) }
                         }) { Icon(Icons.Outlined.Tune, stringResource(R.string.smart_edit)) }
                     }
                     Box {
@@ -214,7 +222,7 @@ fun PlaylistDetailScreen(playlistId: Long, onBack: () -> Unit, onOpenEntry: (Lon
     editRules?.let { rules ->
         PlaylistEditorDialog(
             title = stringResource(R.string.smart_edit),
-            pairs = pairs,
+            pairName = pairName,
             tags = tags,
             initialName = playlist?.name.orEmpty(),
             initialKind = PlaylistKind.SMART,

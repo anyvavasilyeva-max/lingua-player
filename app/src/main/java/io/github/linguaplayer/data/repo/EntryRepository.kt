@@ -89,7 +89,10 @@ class EntryRepository(
         }
     }
 
-    private suspend fun setPlaylistsForEntry(entryId: Long, playlistIds: Set<Long>) {
+    private suspend fun setPlaylistsForEntry(entryId: Long, requested: Set<Long>) {
+        // Только плейлисты той же языковой пары, что и запись.
+        val pairId = entryDao.getById(entryId)?.pairId
+        val playlistIds = requested.filter { playlistDao.getById(it)?.pairId == pairId }.toSet()
         val current = playlistDao.getPlaylistIdsForEntry(entryId).toSet()
         (current - playlistIds).forEach { playlistDao.removeEntries(it, listOf(entryId)) }
         (playlistIds - current).forEach { playlistId ->

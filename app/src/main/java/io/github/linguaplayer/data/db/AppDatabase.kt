@@ -27,7 +27,7 @@ import io.github.linguaplayer.util.TextKeys
         PlaylistEntryCrossRef::class,
         SmartPlaylistTagCrossRef::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -47,8 +47,24 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * v2 → v3: у каждого плейлиста теперь есть языковая пара (библиотеки пар не пересекаются).
+         * Плейлистам без пары назначается пара, к которой относится большинство их записей,
+         * а пустым — первая пара. Схема таблиц не меняется — только данные.
+         */
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "UPDATE playlists SET pair_id = COALESCE(" +
+                        "(SELECT e.pair_id FROM playlist_entries pe JOIN entries e ON e.id = pe.entry_id " +
+                        "WHERE pe.playlist_id = playlists.id GROUP BY e.pair_id ORDER BY COUNT(*) DESC, e.pair_id LIMIT 1), " +
+                        "(SELECT MIN(id) FROM language_pairs)) WHERE pair_id IS NULL",
+                )
+            }
+        }
+
         /** Все миграции схемы перечисляются здесь. */
-        val MIGRATIONS = arrayOf<Migration>(MIGRATION_1_2)
+        val MIGRATIONS = arrayOf<Migration>(MIGRATION_1_2, MIGRATION_2_3)
 
         fun build(context: Context, inMemory: Boolean = false): AppDatabase {
             val builder = if (inMemory) {
